@@ -1,0 +1,51 @@
+# .golangci.yml - Standardized Go Linter Configuration
+
+run:
+  # Default timeout for linter
+  timeout: 5m
+  # Include test files
+  tests: true
+
+output:
+  print-issued-lines: true
+  print-linter-name: true
+
+linters-settings:
+  misspell:
+    locale: US
+
+linters:
+  disable-all: true
+  enable:
+    # --- Core & Bugs ---
+    - bodyclose
+    - copyloopvar
+    - errcheck
+    - govet
+    - nilerr
+    - noctx
+    - reassign
+    - staticcheck
+    - unused
+
+    # --- Style, Performance & Idioms ---
+    - goconst
+    - ineffassign
+    - misspell
+    - mnd
+    - perfsprint
+    - predeclared
+    - revive
+    - whitespace
+
+    # --- Complexity & Meta ---
+    - cyclop
+    - nolintlint
+
+    # --- Security ---
+    - gosec
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0

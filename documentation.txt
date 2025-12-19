@@ -1,0 +1,339 @@
+package core // import "nomledger/pkg/core"
+
+Package core provides the normative validation engine for NomLedger.
+
+It acts as a storage-agnostic validation engine that enforces strict financial
+invariants on in-memory data structures. The package guarantees that any
+Transaction created via its builders or facades satisfies the following rules:
+
+ 1. Non-Empty: A transaction must contain at least one entry.
+ 2. Zero-Sum: The sum of all entries in a transaction must equal zero.
+ 3. Period Closure: Transactions cannot be booked into closed periods unless
+    marked as adjusting events.
+ 4. Currency Consistency: All entries must conform to the ledger's functional
+    currency.
+ 5. Rate Integrity: Exchange rates must be within a tolerance explicitly
+    configured in LedgerConfig.
+
+Error Handling: Failures in normative checks return typed sentinel errors from
+the pkg/errors package (e.g., ErrZeroSumViolation).
+
+Failures in external dependencies (RateProvider) are returned verbatim to the
+caller. These errors are opaque to the engine and are not wrapped.
+
+The primary entry point is the Ledger struct, which is safe for concurrent use.
+Lower-level primitives like TxBuilder are provided for granular control but
+require manual lifecycle management.
+
+TYPES
+
+type Account struct {
+	ID string
+
+	// Type determines the reporting category (Asset, Liability, etc.).
+	Type AccountType
+
+	// Category stores the IFRS 9 measurement tag for reporting utility.
+	Category MeasurementCategory
+
+	// CurrencyCode is the ISO 4217 string for the account's denomination.
+	CurrencyCode string
+
+	// Metadata contains non-normative data (e.g., descriptions, internal codes).
+	// It is passed through opaquely and is not used in validation logic.
+	Metadata map[string]interface{}
+}
+    Account is the fundamental unit of storage for financial classification.
+
+    It separates normative data (ID, Type), which is required for basic
+    reporting, from descriptive metadata. The library does not enforce currency
+    consistency at the Account level; this is enforced at the Transaction level
+    against the Ledger.
+
+type AccountType int8
+    AccountType represents the high-level reporting classification of an
+    account.
+
+    These types are used for report generation (e.g., distinguishing Assets
+    from Liabilities) but are not enforced by the validation engine itself. The
+    engine remains agnostic to "natural balance" rules, allowing for flexible
+    transaction structures.
+
+const (
+	// Asset identifies resources controlled by the entity.
+	Asset AccountType = iota + 1
+	// Liability identifies present obligations of the entity.
+	Liability
+	// Equity identifies the residual interest in the assets of the entity.
+	Equity
+	// Income identifies increases in economic benefits during the accounting period.
+	Income
+	// Expense identifies decreases in economic benefits during the accounting period.
+	Expense
+)
+type Entry struct {
+	// Has unexported fields.
+}
+    Entry represents a single line item in a financial transaction.
+
+    It enforces a strict signed-amount convention where positive values
+    represent debits and negative values represent credits. This convention is
+    uniform across all account types. Fields are unexported to ensure the struct
+    remains immutable and internally consistent after construction.
+
+func NewEntry(
+	accountID string,
+	txAmount decimal.Decimal,
+	txCurrency string,
+	exchangeRate decimal.Decimal,
+	functionalCurrency string,
+) Entry
+    NewEntry constructs an immutable Entry and calculates the functional amount
+    immediately.
+
+    It applies the exchange rate to the transaction amount and performs
+    canonical Banker's Rounding (Half-to-Even) based on the precision of the
+    functional currency. This ensures that the functional amount is fixed at the
+    moment of creation.
+
+func (e Entry) AccountID() string
+    AccountID returns the unique identifier of the associated account.
+
+func (e Entry) ExchangeRate() decimal.Decimal
+    ExchangeRate returns the rate used to convert TxAmount to FunctionalAmount.
+
+func (e Entry) FunctionalAmount() decimal.Decimal
+    FunctionalAmount returns the converted amount in the functional currency.
+    This value is rounded to the precision defined by the functional currency.
+
+func (e Entry) FunctionalCurrency() string
+    FunctionalCurrency returns the ISO 4217 code of the reporting currency.
+
+func (e Entry) TxAmount() decimal.Decimal
+    TxAmount returns the raw amount in the transaction currency. Positive values
+    indicate a debit; negative values indicate a credit.
+
+func (e Entry) TxCurrency() string
+    TxCurrency returns the ISO 4217 code of the original transaction amount.
+
+type Ledger struct {
+	// Has unexported fields.
+}
+    Ledger is the concurrency-safe entry point for the validation engine.
+
+    It encapsulates the configuration and dependencies required to ensure
+    consistent validation rules across all transactions. It serves as a factory
+    for internal builders, preventing state leakage between requests.
+
+func NewLedger(config LedgerConfig, rp interfaces.RateProvider) *Ledger
+    NewLedger constructs a new Ledger instance.
+
+    The provided configuration and rate provider are captured and used for all
+    subsequent validations performed by this instance.
+
+func (l *Ledger) UpdateConfig(newConfig LedgerConfig) *Ledger
+    UpdateConfig returns a new Ledger instance with updated configuration.
+
+    It does not mutate the existing Ledger instance, ensuring that ongoing
+    validations are not affected by configuration changes.
+
+func (l *Ledger) ValidateTransaction(
+	id string,
+	effectiveDate time.Time,
+	isAdjustingEvent bool,
+	entries ...Entry,
+) (Transaction, error)
+    ValidateTransaction constructs and validates a transaction in a single
+    atomic operation.
+
+    It is the recommended API for standard usage as it automatically manages
+    the lifecycle of the underlying builder and dependencies. It returns a fully
+    validated, immutable Transaction or a typed error if validation fails.
+
+type LedgerConfig struct {
+	// ClosedDate is the timestamp up to which the books are finalized.
+	ClosedDate time.Time
+
+	// FunctionalCurrency is the base currency for this ledger instance.
+	// Used to ensure all entries in a transaction conform to the entity's reporting currency.
+	FunctionalCurrency string
+
+	// RateTolerance defines the maximum allowable absolute difference between
+	// the provided entry exchange rate and the RateProvider's rate.
+	// This value must be explicitly configured (e.g., 0.00001).
+	RateTolerance decimal.Decimal
+}
+    LedgerConfig holds the immutable configuration for a validation batch.
+    It acts as the "Closure state definition" for the ledger.
+
+    Invariant 3 (Period Closure): The ClosedDate acts as a watermark.
+    Transactions with an EffectiveDate <= ClosedDate are rejected unless they
+    are explicitly marked as Adjusting Events.
+
+func (c LedgerConfig) Validate() error
+    Validate ensures the configuration is well-formed. It returns
+    ErrInvalidConfiguration if the RateTolerance is negative or if
+    FunctionalCurrency is missing.
+
+type MeasurementCategory int8
+    MeasurementCategory represents IFRS 9 classification tags.
+
+    These are declarative markers used for downstream reporting and valuation
+    logic. The library stores these tags but does not enforce business model
+    tests (SPPI) or amortization logic.
+
+const (
+	// AmortizedCost indicates the asset is held to collect contractual cash flows.
+	AmortizedCost MeasurementCategory = iota + 1
+	// FVTPL indicates the asset is measured at Fair Value Through Profit or Loss.
+	FVTPL
+)
+type Transaction struct {
+	// Has unexported fields.
+}
+    Transaction represents a persisted, valid financial state.
+
+    It is the immutable result of a successful validation process. Callers
+    can safely persist this struct or share it across goroutines. Fields are
+    unexported to enforce strict immutability.
+
+    Note: Metadata values (interface{}) are shallowly copied. If they contain
+    pointers, the underlying data remains mutable by the caller. The Transaction
+    struct itself guarantees structural immutability of the map.
+
+func (t Transaction) EffectiveDate() time.Time
+    EffectiveDate returns the date on which the transaction impacts the ledger.
+
+func (t Transaction) Entries() []Entry
+    Entries returns a defensive copy of the immutable entries associated with
+    this transaction. This prevents external mutation of the underlying slice.
+
+func (t Transaction) ID() string
+    ID returns the unique identifier of the transaction.
+
+type TxBuilder struct {
+	// Has unexported fields.
+}
+    TxBuilder accumulates state for constructing a Transaction.
+
+    It is stateful and not safe for concurrent use. A new builder must be
+    instantiated for each transaction attempt.
+
+func NewTxBuilder(
+	id string,
+	date time.Time,
+	config LedgerConfig,
+	rp interfaces.RateProvider,
+) *TxBuilder
+    NewTxBuilder initializes a builder with the required validation context.
+
+func (b *TxBuilder) AddEntry(e Entry) *TxBuilder
+    AddEntry appends a line item to the transaction.
+
+func (b *TxBuilder) Build() (Transaction, error)
+    Build validates the accumulated state and returns an immutable Transaction.
+
+    It returns a typed error if the state violates zero-sum, period closure,
+    exchange rate tolerance, or configuration invariants.
+
+func (b *TxBuilder) SetAdjustingEvent(isAdjusting bool) *TxBuilder
+    SetAdjustingEvent marks the transaction as an IAS 10 Adjusting Event.
+    If set to true, the transaction may be booked into a closed period.
+
+func (b *TxBuilder) WithMetadata(meta map[string]interface{}) *TxBuilder
+    WithMetadata adds non-normative data to the transaction.
+
+    It performs a shallow copy of the provided map into the builder. Note:
+    Mutating values inside the map after passing them here may affect the
+    builder if they are reference types.
+
+package currency // import "nomledger/pkg/currency"
+
+Package currency provides ISO 4217 precision arithmetic and rounding rules.
+
+It serves as the canonical source of truth for decimal formatting in financial
+calculations, ensuring that all amounts are rounded according to the official
+exponent for their respective currency codes.
+
+FUNCTIONS
+
+func GetPrecision(code string) int32
+    GetPrecision returns the ISO 4217 exponent for a given currency code.
+
+    If the code is unknown, it defaults to 2. This behavior allows the system
+    to handle standard currencies gracefully without strict configuration
+    requirements, though production systems should ideally ensure all codes are
+    known.
+
+func RoundToPrecision(amount decimal.Decimal, currencyCode string) decimal.Decimal
+    RoundToPrecision aligns the amount to the specific precision of the provided
+    currency.
+
+    It utilizes Banker's Rounding (Half-to-Even) to minimize bias in accumulated
+    operations.
+
+package errors // import "nomledger/pkg/errors"
+
+Package errors defines the taxonomy of typed faults returned by the validation
+engine.
+
+These sentinel errors are intended for use with errors.Is to detect specific
+validation failures programmatically.
+
+VARIABLES
+
+var (
+	// ErrZeroSumViolation indicates the transaction entries do not sum to zero.
+	ErrZeroSumViolation = errors.New("transaction does not sum to zero")
+
+	// ErrPeriodClosed indicates the effective date falls in a closed period,
+	// and the event is not marked as an adjusting event.
+	ErrPeriodClosed = errors.New("effective date falls in closed period")
+
+	// ErrRateDeviation indicates the exchange rate provided exceeds the
+	// allowable tolerance compared to the RateProvider.
+	ErrRateDeviation = errors.New("exchange rate exceeds tolerance")
+
+	// ErrInvalidPrecision indicates an amount exceeds the ISO 4217 precision
+	// defined for that currency.
+	ErrInvalidPrecision = errors.New("amount exceeds currency precision")
+
+	// ErrCurrencyMismatch indicates an entry's functional currency does not
+	// match the ledger's configured functional currency.
+	ErrCurrencyMismatch = errors.New("entry functional currency does not match ledger")
+
+	// ErrEmptyTransaction indicates the transaction contains no entries.
+	// Zero-entry transactions are strictly invalid.
+	ErrEmptyTransaction = errors.New("transaction must contain at least one entry")
+
+	// ErrInvalidExchangeRate indicates a logic error in the exchange rate.
+	// Both entry-provided rates and provider-returned rates must be strictly positive.
+	// Zero or negative rates are invalid.
+	ErrInvalidExchangeRate = errors.New("exchange rate must be strictly positive")
+
+	// ErrInvalidConfiguration indicates the LedgerConfig is malformed (e.g. negative tolerance).
+	ErrInvalidConfiguration = errors.New("invalid ledger configuration")
+)
+    Typed Error Taxonomy as defined in the Technical Design.
+
+package interfaces // import "nomledger/pkg/interfaces"
+
+Package interfaces defines the contracts required for external dependency
+injection.
+
+Implementing these interfaces allows the core validation engine to remain
+isolated from infrastructure concerns such as databases or external APIs.
+
+TYPES
+
+type RateProvider interface {
+	// GetRate returns the exchange rate for a currency pair at a specific time.
+	// It should return an error if the rate cannot be determined.
+	GetRate(base, quote string) (decimal.Decimal, error)
+}
+    RateProvider abstracts the source of foreign exchange rates.
+
+    Implementations are responsible for fetching rates from databases, APIs,
+    or caches. The core engine expects this interface to be thread-safe if the
+    Ledger is used concurrently.
+
