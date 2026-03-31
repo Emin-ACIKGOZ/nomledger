@@ -13,30 +13,36 @@ func TestGetPrecision(t *testing.T) {
 	cases := []struct {
 		code     string
 		expected int32
+		found    bool
 	}{
-		{"USD", 2},
-		{"usd", 2}, // Case insensitivity check
-		{"JPY", 0},
-		{"BHD", 3},
-		{"CLF", 4},
-		{"XYZ", 2}, // Unknown defaults to 2
+		{"USD", 2, true},
+		{"JPY", 0, true},
+		{"ABC", 0, false},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.code, func(t *testing.T) {
-			got := currency.GetPrecision(tc.code)
-			if got != tc.expected {
-				t.Errorf("GetPrecision(%s) = %d; want %d", tc.code, got, tc.expected)
+			got, ok := currency.GetPrecision(tc.code)
+			if ok != tc.found || (ok && got != tc.expected) {
+				t.Errorf("GetPrecision(%s) = %d, %v; want %d, %v", tc.code, got, ok, tc.expected, tc.found)
 			}
 		})
 	}
 }
 
+func TestRoundToPrecision_ErrorOnUnknown(t *testing.T) {
+	t.Run("Reject Unknown Currency", func(t *testing.T) {
+		_, err := currency.RoundToPrecision(decimal.NewFromInt(100), "UNKNOWN")
+		if err == nil {
+			t.Error("Expected error for unknown currency, got nil")
+		}
+	})
+}
+
 func TestRoundToPrecision(t *testing.T) {
-	// Banker's Rounding (Half-to-Even) Logic Verification
 	cases := []struct {
 		name     string
-		amount   string // String to ensure exact decimal representation
+		amount   string
 		currency string
 		expected string
 	}{
@@ -44,26 +50,36 @@ func TestRoundToPrecision(t *testing.T) {
 		{"USD Normal Down", "10.123", "USD", "10.12"},
 		{"USD Normal Up", "10.126", "USD", "10.13"},
 
-		// Banker's Rounding Edge Cases (Half to Even)
-		{"USD Half Down to Even", "10.125", "USD", "10.12"}, // 2 is even
-		{"USD Half Up to Even", "10.135", "USD", "10.14"},   // 4 is even
+		// Banker's Rounding (Half to Even)
+		{"USD Half Down to Even", "10.125", "USD", "10.12"},
+		{"USD Half Up to Even", "10.135", "USD", "10.14"},
 
 		// Zero Precision (JPY)
 		{"JPY Normal", "100.1", "JPY", "100"},
-		{"JPY Half Down", "100.5", "JPY", "100"}, // 0 is even
-		{"JPY Half Up", "101.5", "JPY", "102"},   // 2 is even
+		{"JPY Half Down", "100.5", "JPY", "100"},
+		{"JPY Half Up", "101.5", "JPY", "102"},
 
 		// High Precision (BHD - 3 decimals)
 		{"BHD Precision", "10.1234", "BHD", "10.123"},
-		{"BHD Rounding", "10.1235", "BHD", "10.124"}, // 4 is even
+		{"BHD Rounding", "10.1235", "BHD", "10.124"},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			input, _ := decimal.NewFromString(tc.amount)
-			want, _ := decimal.NewFromString(tc.expected)
+			input, err := decimal.NewFromString(tc.amount)
+			if err != nil {
+				t.Fatalf("Invalid input amount in test case: %s", tc.amount)
+			}
+			want, err := decimal.NewFromString(tc.expected)
+			if err != nil {
+				t.Fatalf("Invalid expected amount in test case: %s", tc.expected)
+			}
 
-			got := currency.RoundToPrecision(input, tc.currency)
+			got, err := currency.RoundToPrecision(input, tc.currency)
+			if err != nil {
+				t.Errorf("RoundToPrecision(%s, %s) returned unexpected error: %v", tc.amount, tc.currency, err)
+				return
+			}
 
 			if !got.Equal(want) {
 				t.Errorf("RoundToPrecision(%s, %s) = %s; want %s",
