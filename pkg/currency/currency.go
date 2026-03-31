@@ -3,6 +3,7 @@
 package currency
 
 import (
+	"nomledger/pkg/errors"
 	"strings"
 
 	"github.com/shopspring/decimal"
@@ -28,23 +29,19 @@ var precisionTable = map[string]int32{
 }
 
 // GetPrecision returns the ISO 4217 exponent for a given currency code.
-//
-// If the code is unknown, it defaults to 2. This behavior allows the system
-// to handle standard currencies gracefully without strict configuration requirements,
-// though production systems should ideally ensure all codes are known.
-func GetPrecision(code string) int32 {
+func GetPrecision(code string) (int32, bool) {
 	p, ok := precisionTable[strings.ToUpper(code)]
-	if !ok {
-		return defaultPrecision
-	}
-	return p
+	return p, ok
 }
 
 // RoundToPrecision aligns the amount to the specific precision of the provided currency.
 //
 // It utilizes Banker's Rounding (Half-to-Even) to minimize bias in accumulated
 // operations.
-func RoundToPrecision(amount decimal.Decimal, currencyCode string) decimal.Decimal {
-	precision := GetPrecision(currencyCode)
-	return amount.RoundBank(precision)
+func RoundToPrecision(amount decimal.Decimal, currencyCode string) (decimal.Decimal, error) {
+	precision, ok := GetPrecision(currencyCode)
+	if !ok {
+		return decimal.Zero, errors.ErrUnknownCurrency
+	}
+	return amount.RoundBank(precision), nil
 }

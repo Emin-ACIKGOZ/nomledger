@@ -3,7 +3,9 @@
 package core
 
 import (
+	"errors"
 	"nomledger/pkg/currency"
+	pkgerr "nomledger/pkg/errors"
 
 	"github.com/shopspring/decimal"
 )
@@ -38,9 +40,20 @@ func NewEntry(
 	txCurrency string,
 	exchangeRate decimal.Decimal,
 	functionalCurrency string,
-) Entry {
+) (Entry, error) {
+	if txCurrency == functionalCurrency && !exchangeRate.Equal(decimal.NewFromInt(1)) {
+		return Entry{}, pkgerr.ErrInvalidExchangeRate
+	}
+
 	rawAmount := txAmount.Mul(exchangeRate)
-	canonicalAmount := currency.RoundToPrecision(rawAmount, functionalCurrency)
+	canonicalAmount, err := currency.RoundToPrecision(rawAmount, functionalCurrency)
+	if err != nil {
+		return Entry{}, err
+	}
+
+	if !txAmount.IsZero() && canonicalAmount.IsZero() {
+		return Entry{}, errors.New("functional amount rounded to zero")
+	}
 
 	return Entry{
 		accountID:          accountID,
@@ -49,7 +62,7 @@ func NewEntry(
 		exchangeRate:       exchangeRate,
 		functionalAmount:   canonicalAmount,
 		functionalCurrency: functionalCurrency,
-	}
+	}, nil
 }
 
 // AccountID returns the unique identifier of the associated account.

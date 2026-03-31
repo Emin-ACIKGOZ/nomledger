@@ -20,55 +20,95 @@ func (f failingRateProvider) GetRate(_, _ string) (decimal.Decimal, error) {
 	return decimal.Zero, errors.New("upstream rate service unavailable")
 }
 
-func TestTxBuilder_EdgeCases_PennySplit(t *testing.T) {
-	// Common Setup
+func TestTxBuilder_PennySplit_RoundingViolation(t *testing.T) {
 	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	config := core.LedgerConfig{
 		ClosedDate:         time.Date(2023, 12, 31, 23, 59, 59, 0, time.UTC),
 		FunctionalCurrency: "USD",
 		RateTolerance:      decimal.NewFromFloat(0.00001),
 	}
-	// Standard Mock: 1 EUR = 1.1 USD
 	rp := mockRateProvider{
 		rates: map[string]decimal.Decimal{
 			"EUR/USD": decimal.NewFromFloat(1.1),
 		},
 	}
 
-	t.Run("Rounding Validation", func(t *testing.T) {
-		// Scenario: Splitting $100.00 among 3 accounts.
-		b := core.NewTxBuilder("tx-split", baseTime, config, rp)
+	// Scenario: Splitting $100.00 among 3 accounts.
+	b := core.NewTxBuilder("tx-split", baseTime, config, rp)
 
-		// Debit Source: 100.00
-		b.AddEntry(core.NewEntry("source", decimal.NewFromFloat(100.00), "USD", decimal.NewFromInt(1), "USD"))
+	// Debit Source: 100.00
+	eSource, err := core.NewEntry("source", decimal.NewFromFloat(100.00), "USD", decimal.NewFromInt(1), "USD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b.AddEntry(eSource)
 
-		// Credit 1 & 2: -33.33
-		b.AddEntry(core.NewEntry("dest1", decimal.NewFromFloat(-33.33), "USD", decimal.NewFromInt(1), "USD"))
-		b.AddEntry(core.NewEntry("dest2", decimal.NewFromFloat(-33.33), "USD", decimal.NewFromInt(1), "USD"))
+	// Credit 1 & 2: -33.33
+	eDest1, err := core.NewEntry("dest1", decimal.NewFromFloat(-33.33), "USD", decimal.NewFromInt(1), "USD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b.AddEntry(eDest1)
+	eDest2, err := core.NewEntry("dest2", decimal.NewFromFloat(-33.33), "USD", decimal.NewFromInt(1), "USD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b.AddEntry(eDest2)
 
-		// Case A: Naive Entry (-33.33) -> Sum is 0.01 (Violation)
-		badEntry := core.NewEntry("dest3", decimal.NewFromFloat(-33.33), "USD", decimal.NewFromInt(1), "USD")
-		b.AddEntry(badEntry)
+	// Case A: Naive Entry (-33.33) -> Sum is 0.01 (Violation)
+	badEntry, err := core.NewEntry("dest3", decimal.NewFromFloat(-33.33), "USD", decimal.NewFromInt(1), "USD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b.AddEntry(badEntry)
 
-		_, err := b.Build()
-		if !errors.Is(err, pkgerr.ErrZeroSumViolation) {
-			t.Errorf("Penny Split: Expected ErrZeroSumViolation for naive split, got %v", err)
-		}
+	_, err = b.Build()
+	if !errors.Is(err, pkgerr.ErrZeroSumViolation) {
+		t.Errorf("Penny Split: Expected ErrZeroSumViolation for naive split, got %v", err)
+	}
+}
 
-		// Case B: Corrected Entry (-33.34) -> Sum is 0.00
-		bCorrect := core.NewTxBuilder("tx-split-ok", baseTime, config, rp)
-		bCorrect.AddEntry(core.NewEntry("source", decimal.NewFromFloat(100.00), "USD", decimal.NewFromInt(1), "USD"))
-		bCorrect.AddEntry(core.NewEntry("dest1", decimal.NewFromFloat(-33.33), "USD", decimal.NewFromInt(1), "USD"))
-		bCorrect.AddEntry(core.NewEntry("dest2", decimal.NewFromFloat(-33.33), "USD", decimal.NewFromInt(1), "USD"))
+func TestTxBuilder_PennySplit_ManualAllocation(t *testing.T) {
+	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	config := core.LedgerConfig{
+		ClosedDate:         time.Date(2023, 12, 31, 23, 59, 59, 0, time.UTC),
+		FunctionalCurrency: "USD",
+		RateTolerance:      decimal.NewFromFloat(0.00001),
+	}
+	rp := mockRateProvider{
+		rates: map[string]decimal.Decimal{
+			"EUR/USD": decimal.NewFromFloat(1.1),
+		},
+	}
 
-		goodEntry := core.NewEntry("dest3", decimal.NewFromFloat(-33.34), "USD", decimal.NewFromInt(1), "USD")
-		bCorrect.AddEntry(goodEntry)
+	// Case B: Corrected Entry (-33.34) -> Sum is 0.00
+	bCorrect := core.NewTxBuilder("tx-split-ok", baseTime, config, rp)
+	eSourceC, err := core.NewEntry("source", decimal.NewFromFloat(100.00), "USD", decimal.NewFromInt(1), "USD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bCorrect.AddEntry(eSourceC)
+	eDest1C, err := core.NewEntry("dest1", decimal.NewFromFloat(-33.33), "USD", decimal.NewFromInt(1), "USD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bCorrect.AddEntry(eDest1C)
+	eDest2C, err := core.NewEntry("dest2", decimal.NewFromFloat(-33.33), "USD", decimal.NewFromInt(1), "USD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bCorrect.AddEntry(eDest2C)
 
-		_, err = bCorrect.Build()
-		if err != nil {
-			t.Errorf("Penny Split: Expected success for manual penny allocation, got %v", err)
-		}
-	})
+	goodEntry, err := core.NewEntry("dest3", decimal.NewFromFloat(-33.34), "USD", decimal.NewFromInt(1), "USD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bCorrect.AddEntry(goodEntry)
+
+	_, err = bCorrect.Build()
+	if err != nil {
+		t.Errorf("Penny Split: Expected success for manual penny allocation, got %v", err)
+	}
 }
 
 func TestTxBuilder_EdgeCases_DependencyFailure(t *testing.T) {
@@ -86,17 +126,23 @@ func TestTxBuilder_EdgeCases_DependencyFailure(t *testing.T) {
 
 		// Entry 1: Requires conversion (Will fail at Rate check)
 		// 100 EUR * 1.1 = 110 USD
-		e1 := core.NewEntry("acc", decimal.NewFromInt(100), "EUR", decimal.NewFromFloat(1.1), "USD")
+		e1, err := core.NewEntry("acc", decimal.NewFromInt(100), "EUR", decimal.NewFromFloat(1.1), "USD")
+		if err != nil {
+			t.Fatal(err)
+		}
 		b.AddEntry(e1)
 
 		// Entry 2: Balancing Entry (USD)
 		// We add -110 USD so the Zero-Sum check passes.
 		// Since TxCurrency (USD) == FuncCurrency (USD), this skips the rate check,
 		// isolating the failure to Entry 1.
-		e2 := core.NewEntry("acc-balance", decimal.NewFromInt(-110), "USD", decimal.NewFromInt(1), "USD")
+		e2, err := core.NewEntry("acc-balance", decimal.NewFromInt(-110), "USD", decimal.NewFromInt(1), "USD")
+		if err != nil {
+			t.Fatal(err)
+		}
 		b.AddEntry(e2)
 
-		_, err := b.Build()
+		_, err = b.Build()
 		if err == nil {
 			t.Fatal("Expected error from failing rate provider, got nil")
 		}
@@ -126,18 +172,28 @@ func TestTxBuilder_EdgeCases_Tolerance(t *testing.T) {
 
 		// 1. Exact Boundary Pass (Diff 0.00001)
 		ratePass := decimal.NewFromFloat(1.10001)
-		ePass := core.NewEntry("acc1", decimal.NewFromInt(100), "EUR", ratePass, "USD")
+		ePass, err := core.NewEntry("acc1", decimal.NewFromInt(100), "EUR", ratePass, "USD")
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		// 2. Just Over Boundary Fail (Diff 0.00002)
 		rateFail := decimal.NewFromFloat(1.10002)
-		eFail := core.NewEntry("acc2", decimal.NewFromInt(100), "EUR", rateFail, "USD")
+		eFail, err := core.NewEntry("acc2", decimal.NewFromInt(100), "EUR", rateFail, "USD")
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		// Test Pass Case
 		b.AddEntry(ePass)
 		// Balancing entry: -100 EUR converted at SAME rate to avoid noise
-		b.AddEntry(core.NewEntry("acc1-offset", decimal.NewFromInt(-100), "EUR", ratePass, "USD"))
+		ePassOffset, err := core.NewEntry("acc1-offset", decimal.NewFromInt(-100), "EUR", ratePass, "USD")
+		if err != nil {
+			t.Fatal(err)
+		}
+		b.AddEntry(ePassOffset)
 
-		_, err := b.Build()
+		_, err = b.Build()
 		if err != nil {
 			t.Errorf("Expected exact tolerance boundary (0.00001) to PASS, got %v", err)
 		}
@@ -145,7 +201,11 @@ func TestTxBuilder_EdgeCases_Tolerance(t *testing.T) {
 		// Test Fail Case
 		bFail := core.NewTxBuilder("tx-boundary-fail", baseTime, config, rp)
 		bFail.AddEntry(eFail)
-		bFail.AddEntry(core.NewEntry("acc2-offset", decimal.NewFromInt(-100), "EUR", rateFail, "USD"))
+		eFailOffset, err := core.NewEntry("acc2-offset", decimal.NewFromInt(-100), "EUR", rateFail, "USD")
+		if err != nil {
+			t.Fatal(err)
+		}
+		bFail.AddEntry(eFailOffset)
 
 		_, err = bFail.Build()
 		if !errors.Is(err, pkgerr.ErrRateDeviation) {
@@ -174,10 +234,18 @@ func TestTxBuilder_EdgeCases_Timezone(t *testing.T) {
 		dateClosed := time.Date(2023, 12, 31, 18, 59, 59, 0, locEST)
 
 		bClosed := core.NewTxBuilder("tx-tz-closed", dateClosed, config, rp)
-		bClosed.AddEntry(core.NewEntry("a", decimal.NewFromInt(1), "USD", decimal.NewFromInt(1), "USD"))
-		bClosed.AddEntry(core.NewEntry("b", decimal.NewFromInt(-1), "USD", decimal.NewFromInt(1), "USD"))
+		eaClosed, err := core.NewEntry("a", decimal.NewFromInt(1), "USD", decimal.NewFromInt(1), "USD")
+		if err != nil {
+			t.Fatal(err)
+		}
+		bClosed.AddEntry(eaClosed)
+		ebClosed, err := core.NewEntry("b", decimal.NewFromInt(-1), "USD", decimal.NewFromInt(1), "USD")
+		if err != nil {
+			t.Fatal(err)
+		}
+		bClosed.AddEntry(ebClosed)
 
-		_, err := bClosed.Build()
+		_, err = bClosed.Build()
 		if !errors.Is(err, pkgerr.ErrPeriodClosed) {
 			t.Errorf("Timezone logic: Expected 18:59:59 EST (23:59:59 UTC) to be CLOSED, got %v", err)
 		}
@@ -187,8 +255,16 @@ func TestTxBuilder_EdgeCases_Timezone(t *testing.T) {
 		dateOpen := time.Date(2023, 12, 31, 19, 0, 0, 0, locEST)
 
 		bOpen := core.NewTxBuilder("tx-tz-open", dateOpen, config, rp)
-		bOpen.AddEntry(core.NewEntry("a", decimal.NewFromInt(1), "USD", decimal.NewFromInt(1), "USD"))
-		bOpen.AddEntry(core.NewEntry("b", decimal.NewFromInt(-1), "USD", decimal.NewFromInt(1), "USD"))
+		eaOpen, err := core.NewEntry("a", decimal.NewFromInt(1), "USD", decimal.NewFromInt(1), "USD")
+		if err != nil {
+			t.Fatal(err)
+		}
+		bOpen.AddEntry(eaOpen)
+		ebOpen, err := core.NewEntry("b", decimal.NewFromInt(-1), "USD", decimal.NewFromInt(1), "USD")
+		if err != nil {
+			t.Fatal(err)
+		}
+		bOpen.AddEntry(ebOpen)
 
 		_, err = bOpen.Build()
 		if err != nil {

@@ -48,8 +48,17 @@ import (
 	"time"
 
 	"github.com/shopspring/decimal"
+
 	"github.com/Emin-ACIKGOZ/nomledger/pkg/core"
 )
+
+// FixedRateProvider is a minimal RateProvider implementation.
+// It returns a constant 1:1 exchange rate for demonstration purposes.
+type FixedRateProvider struct{}
+
+func (f FixedRateProvider) GetRate(base, quote string) (decimal.Decimal, error) {
+	return decimal.NewFromInt(1), nil
+}
 
 func main() {
 	config := core.LedgerConfig{
@@ -60,28 +69,35 @@ func main() {
 
 	ledger := core.NewLedger(config, FixedRateProvider{})
 
+	e1, err := core.NewEntry(
+		"acc-marketing",
+		decimal.NewFromInt(100),
+		"USD",
+		decimal.NewFromInt(1),
+		"USD",
+	)
+	if err != nil {
+		log.Fatalf("entry creation failed: %v", err)
+	}
+
+	e2, err := core.NewEntry(
+		"acc-cash",
+		decimal.NewFromInt(-100),
+		"USD",
+		decimal.NewFromInt(1),
+		"USD",
+	)
+	if err != nil {
+		log.Fatalf("entry creation failed: %v", err)
+	}
+
 	tx, err := ledger.ValidateTransaction(
 		"tx-101",
 		time.Now(),
 		false,
-
-		core.NewEntry(
-			"acc-marketing",
-			decimal.NewFromInt(100),
-			"USD",
-			decimal.NewFromInt(1),
-			"USD",
-		),
-
-		core.NewEntry(
-			"acc-cash",
-			decimal.NewFromInt(-100),
-			"USD",
-			decimal.NewFromInt(1),
-			"USD",
-		),
+		e1,
+		e2,
 	)
-
 	if err != nil {
 		log.Fatalf("validation failed: %v", err)
 	}

@@ -36,4 +36,7 @@ var (
 
 	// ErrInvalidConfiguration indicates the LedgerConfig is malformed (e.g. negative tolerance).
 	ErrInvalidConfiguration = errors.New("invalid ledger configuration")
+
+	// ErrUnknownCurrency indicates the currency code is not supported by the precision table.
+	ErrUnknownCurrency = errors.New("unknown or unsupported currency code")
 )
