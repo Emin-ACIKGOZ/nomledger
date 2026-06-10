@@ -19,6 +19,28 @@ go get github.com/Emin-ACIKGOZ/nomledger
 
 NomLedger validates raw financial inputs and returns immutable, validated transactions ready for persistence.
 
+```mermaid
+graph TD
+    subgraph Inputs
+    E[Raw Entries]
+    R[Rate Provider]
+    C[Ledger Config]
+    end
+
+    subgraph Validation Pipeline
+    E --> V1[Non-Empty Check]
+    V1 --> V2[Zero-Sum Balancing]
+    V2 --> V3[Period Closure Check]
+    V3 --> V4[Currency Consistency]
+    V4 --> V5[Rate Integrity Tolerance]
+    R -.-> V5
+    end
+
+    subgraph Output
+    V5 --> TX[Immutable Validated Transaction]
+    end
+```
+
 ### 1. Define a Rate Provider
 
 Implement `interfaces.RateProvider` to supply exchange rates from your chosen source.
