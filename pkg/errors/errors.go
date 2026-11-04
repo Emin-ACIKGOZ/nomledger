@@ -43,6 +43,17 @@ var (
 	// lookup was attempted without one.
 	ErrNilRateProvider = errors.New("rate provider must not be nil")
 
+	// ErrInvalidTransactionID indicates the transaction ID is empty, too long,
+	// or contains a control character.
+	ErrInvalidTransactionID = errors.New("invalid transaction ID")
+
+	// ErrInvalidEffectiveDate indicates the effective date is the zero time.
+	ErrInvalidEffectiveDate = errors.New("invalid effective date")
+
+	// ErrInvalidMetadata indicates a metadata key is empty, too long, or
+	// contains a control character.
+	ErrInvalidMetadata = errors.New("invalid metadata")
+
 	// ErrInvalidAccountID indicates the account ID is empty, too long, or
 	// contains a control character.
 	ErrInvalidAccountID = errors.New("invalid account ID")
