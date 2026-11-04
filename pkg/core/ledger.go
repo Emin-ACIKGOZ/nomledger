@@ -19,17 +19,34 @@ import (
 type Ledger struct {
 	config       LedgerConfig
 	rateProvider interfaces.RateProvider
+	clock        Clock
 }
 
 // NewLedger constructs a new Ledger instance.
 //
-// It validates and normalises the configuration before accepting it, and rejects
-// a nil rate provider with ErrNilRateProvider. Errors are *ValidationError
-// values with Operation "NewLedger" and Field "config" or "provider".
-func NewLedger(config LedgerConfig, provider interfaces.RateProvider) (*Ledger, error) {
+// It validates and normalises the configuration before accepting it, applies
+// options, defaults a nil clock to time.Now, and rejects a nil rate provider
+// with ErrNilRateProvider. Option failures and other errors are *ValidationError
+// values with Operation "NewLedger" and Field "clock", "config", or "provider".
+func NewLedger(config LedgerConfig, provider interfaces.RateProvider, opts ...LedgerOption) (*Ledger, error) {
 	if err := config.Validate(); err != nil {
 		return nil, rewrapValidationError(err, "NewLedger", "config")
 	}
+
+	options := ledgerOptions{}
+	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
+		if err := opt(&options); err != nil {
+			return nil, rewrapValidationError(err, "NewLedger", "clock")
+		}
+	}
+	clock := options.clock
+	if clock == nil {
+		clock = ClockFunc(time.Now)
+	}
+
 	if provider == nil {
 		return nil, pkgerr.NewValidationError(pkgerr.ErrNilRateProvider, "NewLedger", "provider", nil)
 	}
@@ -37,6 +54,7 @@ func NewLedger(config LedgerConfig, provider interfaces.RateProvider) (*Ledger, 
 	return &Ledger{
 		config:       normalizeConfig(config),
 		rateProvider: provider,
+		clock:        clock,
 	}, nil
 }
 
@@ -48,9 +66,16 @@ func NewLedger(config LedgerConfig, provider interfaces.RateProvider) (*Ledger, 
 // any validation work, including for same-currency-only transactions. The input
 // entries and metadata map are copied, so later mutation of the input cannot
 // change the returned transaction. Validation uses the same pipeline as
-// TxBuilder.Build and does not mutate the ledger.
+// TxBuilder.Build and does not mutate the ledger. The ledger's injected clock
+// determines PostedAt, which is always stored in UTC.
 func (l *Ledger) ValidateTransaction(ctx context.Context, in TransactionInput) (Transaction, error) {
-	b := NewTxBuilder(in.ID, in.EffectiveDate, l.config, l.rateProvider)
+	b := NewTxBuilder(
+		in.ID,
+		in.EffectiveDate,
+		l.config,
+		l.rateProvider,
+		WithBuilderClock(l.clock),
+	)
 	b.isAdjustingEvent = in.IsAdjustingEvent
 	b.entries = append([]Entry(nil), in.Entries...)
 	b.WithMetadata(in.Metadata)
@@ -84,9 +109,9 @@ func (l *Ledger) Config() LedgerConfig {
 
 // UpdateConfig returns a new validated Ledger with updated configuration.
 //
-// It preserves the existing rate provider and never mutates the receiver.
-// Errors are *ValidationError values with Operation "UpdateConfig" and Field
-// "config".
+// It preserves the existing rate provider and clock, and never mutates the
+// receiver. Errors are *ValidationError values with Operation "UpdateConfig"
+// and Field "config".
 func (l *Ledger) UpdateConfig(config LedgerConfig) (*Ledger, error) {
 	if err := config.Validate(); err != nil {
 		return nil, rewrapValidationError(err, "UpdateConfig", "config")
@@ -95,5 +120,6 @@ func (l *Ledger) UpdateConfig(config LedgerConfig) (*Ledger, error) {
 	return &Ledger{
 		config:       normalizeConfig(config),
 		rateProvider: l.rateProvider,
+		clock:        l.clock,
 	}, nil
 }

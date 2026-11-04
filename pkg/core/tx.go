@@ -98,18 +98,41 @@ type TxBuilder struct {
 	metadata         map[string]any
 	operation        string
 	finalized        bool
+	initErr          error
+	clock            Clock
 
 	rateProvider interfaces.RateProvider
 	config       LedgerConfig
 }
 
 // NewTxBuilder initializes a builder with the required validation context.
+//
+// Options configure the builder; a nil clock option means time.Now. Option
+// errors are stored and returned by Build as a structured error with Field
+// "clock".
 func NewTxBuilder(
 	id string,
 	date time.Time,
 	config LedgerConfig,
 	rp interfaces.RateProvider,
+	opts ...BuilderOption,
 ) *TxBuilder {
+	options := builderOptions{}
+	var initErr error
+	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
+		if err := opt(&options); err != nil {
+			initErr = err
+			break
+		}
+	}
+	clock := options.clock
+	if clock == nil {
+		clock = ClockFunc(time.Now)
+	}
+
 	return &TxBuilder{
 		id:            id,
 		effectiveDate: date,
@@ -118,6 +141,8 @@ func NewTxBuilder(
 		entries:       make([]Entry, 0),
 		metadata:      make(map[string]any),
 		operation:     buildOperation,
+		initErr:       initErr,
+		clock:         clock,
 	}
 }
 
@@ -178,7 +203,9 @@ func (b *TxBuilder) WithMetadata(meta map[string]any) *TxBuilder {
 // while preserving their cause.
 //
 // A failed Build leaves the builder retryable. A successful Build finalizes the
-// builder; a subsequent Build returns ErrBuilderFinalized.
+// builder; a subsequent Build returns ErrBuilderFinalized. A builder-option
+// error is returned before other validation. PostedAt is read once from the
+// builder clock (default time.Now) and stored in UTC.
 func (b *TxBuilder) Build() (Transaction, error) {
 	operation := b.operation
 	if operation == "" {
@@ -196,8 +223,8 @@ func (b *TxBuilder) Build() (Transaction, error) {
 }
 
 func (b *TxBuilder) build(ctx context.Context) (Transaction, error) {
-	if b.operation == "" {
-		b.operation = buildOperation
+	if err := b.prepare(); err != nil {
+		return Transaction{}, err
 	}
 
 	ctx, err := validationContext(ctx, b.operation)
@@ -252,12 +279,30 @@ func (b *TxBuilder) build(ctx context.Context) (Transaction, error) {
 		id:               b.id,
 		effectiveDate:    effectiveDate,
 		isAdjustingEvent: b.isAdjustingEvent,
-		postedAt:         time.Now().UTC(),
+		postedAt:         b.now(),
 		entries:          append([]Entry(nil), b.entries...),
 		metadata:         copyMetadata(b.metadata),
 	}
 	b.finalized = true
 	return transaction, nil
+}
+
+func (b *TxBuilder) prepare() error {
+	if b.operation == "" {
+		b.operation = buildOperation
+	}
+	if b.initErr != nil {
+		return rewrapValidationError(b.initErr, b.operation, "clock")
+	}
+	return nil
+}
+
+func (b *TxBuilder) now() time.Time {
+	clock := b.clock
+	if clock == nil {
+		clock = ClockFunc(time.Now)
+	}
+	return clock.Now().UTC()
 }
 
 func validationContext(ctx context.Context, operation string) (context.Context, error) {
