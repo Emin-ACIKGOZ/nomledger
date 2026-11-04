@@ -16,9 +16,12 @@ import (
 // returned rate is quote units per one base unit. AsOf is the transaction's
 // effective date in UTC.
 type RateRequest struct {
-	Base  currency.Code
+	// Base is the transaction currency.
+	Base currency.Code
+	// Quote is the functional currency.
 	Quote currency.Code
-	AsOf  time.Time
+	// AsOf is the transaction effective date in UTC.
+	AsOf time.Time
 }
 
 // RateProvider abstracts the source of foreign exchange rates.

@@ -1,13 +1,18 @@
-
 # NomLedger
 
-**NomLedger** is a storage-agnostic financial **validation engine** for Go that enforces strict accounting invariants on in-memory data before persistence.
+**NomLedger** is a storage-agnostic, double-entry **validation core** for Go. It
+checks in-memory financial data against explicit accounting invariants before
+the data is persisted anywhere.
 
 ## Overview
 
-NomLedger ensures that every transaction satisfies explicit accounting rules, including zero-sum balancing, period closure enforcement, currency consistency, and exchange rate integrity. It validates financial state deterministically before data is written to any database, message log, or external system.
+NomLedger validates transactions and returns structurally immutable,
+currency-aware values ready for persistence. It guarantees non-empty entries,
+exact zero-sum balancing, period closure rules, functional-currency consistency,
+and as-of exchange-rate integrity.
 
-The library is **not** an ORM, ledger database, or reporting engine. Its sole responsibility is enforcing correctness invariants.
+It does **not** store, aggregate, report, or source financial data. Its job is
+to reject invalid financial state before a caller writes it elsewhere.
 
 ## Installation
 
@@ -15,167 +20,317 @@ The library is **not** an ORM, ledger database, or reporting engine. Its sole re
 go get github.com/Emin-ACIKGOZ/nomledger
 ```
 
-## Usage
+## Quick start
 
-NomLedger validates raw financial inputs and returns immutable, validated transactions ready for persistence.
-
-```mermaid
-graph TD
-    subgraph Inputs
-    E[Raw Entries]
-    R[Rate Provider]
-    C[Ledger Config]
-    end
-
-    subgraph Validation Pipeline
-    E --> V1[Non-Empty Check]
-    V1 --> V2[Zero-Sum Balancing]
-    V2 --> V3[Period Closure Check]
-    V3 --> V4[Currency Consistency]
-    V4 --> V5[Rate Integrity Tolerance]
-    R -.-> V5
-    end
-
-    subgraph Output
-    V5 --> TX[Immutable Validated Transaction]
-    end
-```
-
-### 1. Define a Rate Provider
-
-Implement `interfaces.RateProvider` to supply exchange rates from your chosen source.
-
-```go
-import (
-	"github.com/shopspring/decimal"
-	"github.com/Emin-ACIKGOZ/nomledger/pkg/interfaces"
-)
-
-type FixedRateProvider struct{}
-
-func (f FixedRateProvider) GetRate(base, quote string) (decimal.Decimal, error) {
-	return decimal.NewFromFloat(1.0), nil
-}
-```
-
-### 2. Validate a Transaction
-
-Initialize the engine with an explicit configuration and validate atomically.
+This is a complete, compilable program using the v1 API and an injected clock
+for deterministic `PostedAt` values.
 
 ```go
 package main
 
 import (
-	"log"
+	"context"
+	"fmt"
 	"time"
 
 	"github.com/shopspring/decimal"
 
 	"github.com/Emin-ACIKGOZ/nomledger/pkg/core"
+	"github.com/Emin-ACIKGOZ/nomledger/pkg/interfaces"
 )
-
-// FixedRateProvider is a minimal RateProvider implementation.
-// It returns a constant 1:1 exchange rate for demonstration purposes.
-type FixedRateProvider struct{}
-
-func (f FixedRateProvider) GetRate(base, quote string) (decimal.Decimal, error) {
-	return decimal.NewFromInt(1), nil
-}
 
 func main() {
 	config := core.LedgerConfig{
 		FunctionalCurrency: "USD",
 		ClosedDate:         time.Date(2023, 12, 31, 23, 59, 59, 0, time.UTC),
-		RateTolerance:      decimal.NewFromFloat(0.00001),
+		RateTolerance:      decimal.RequireFromString("0.00001"),
 	}
 
-	ledger := core.NewLedger(config, FixedRateProvider{})
+	provider := interfaces.RateProviderFunc(func(ctx context.Context, req interfaces.RateRequest) (decimal.Decimal, error) {
+		return decimal.NewFromInt(1), nil
+	})
+	clock := core.ClockFunc(func() time.Time {
+		return time.Date(2024, 6, 1, 12, 0, 0, 0, time.UTC)
+	})
 
-	e1, err := core.NewEntry(
-		"acc-marketing",
-		decimal.NewFromInt(100),
-		"USD",
-		decimal.NewFromInt(1),
-		"USD",
-	)
+	ledger, err := core.NewLedger(config, provider, core.WithClock(clock))
 	if err != nil {
-		log.Fatalf("entry creation failed: %v", err)
+		panic(err)
 	}
 
-	e2, err := core.NewEntry(
+	cash, err := core.NewEntry(
 		"acc-cash",
-		decimal.NewFromInt(-100),
+		decimal.RequireFromString("100.00"),
 		"USD",
 		decimal.NewFromInt(1),
 		"USD",
 	)
 	if err != nil {
-		log.Fatalf("entry creation failed: %v", err)
+		panic(err)
 	}
-
-	tx, err := ledger.ValidateTransaction(
-		"tx-101",
-		time.Now(),
-		false,
-		e1,
-		e2,
+	revenue, err := core.NewEntry(
+		"acc-revenue",
+		decimal.RequireFromString("-100.00"),
+		"USD",
+		decimal.NewFromInt(1),
+		"USD",
 	)
 	if err != nil {
-		log.Fatalf("validation failed: %v", err)
+		panic(err)
 	}
 
-	// tx is immutable and safe to persist or share across goroutines
-	_ = tx
+	input := core.TransactionInput{
+		ID:            "tx-101",
+		EffectiveDate: time.Date(2024, 6, 1, 12, 0, 0, 0, time.UTC),
+		Entries:       []core.Entry{cash, revenue},
+		Metadata:      map[string]any{"source": "readme"},
+	}
+
+	tx, err := ledger.ValidateTransaction(context.Background(), input)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("validated %s with %d entries at %s\n",
+		tx.ID(), len(tx.Entries()), tx.PostedAt().Format(time.RFC3339))
 }
 ```
 
-## Core Guarantees
+## Error handling
 
-All validated transactions enforce the following invariants:
+Every validation failure matches a sentinel with `errors.Is` and exposes
+structured context through `errors.As`.
 
-* **Non-Empty Transactions**: A transaction must contain at least one entry, and each entry must have a non-zero functional amount. Zero-entry and zero-valued entries are invalid.
-* **Zero-Sum Accounting**: The sum of all functional amounts must equal zero
-  *(convention: positive = debit, negative = credit; zero-valued entries are invalid)*.
-* **Period Closure**: Transactions with an effective date less than or equal to the configured closed date are rejected unless explicitly marked as adjusting events.
-* **Currency Consistency**: All entries must resolve into the single functional currency defined by the ledger configuration.
-* **Rate Integrity**:
+```go
+package main
 
-  * Entry-provided exchange rates must be strictly positive.
-  * Provider-returned exchange rates must be strictly positive.
-  * The absolute difference between the entry rate and provider rate must not exceed the explicitly configured tolerance.
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
 
-Validated transactions are immutable and safe for concurrent use.
+	"github.com/shopspring/decimal"
 
-## Architecture
+	"github.com/Emin-ACIKGOZ/nomledger/pkg/core"
+	pkgerr "github.com/Emin-ACIKGOZ/nomledger/pkg/errors"
+	"github.com/Emin-ACIKGOZ/nomledger/pkg/interfaces"
+)
 
-* **`core`**: Validation engine, `Ledger` facade, and `TxBuilder`.
-* **`currency`**: ISO 4217 precision tables and banker's rounding utilities.
-* **`errors`**: Typed sentinel errors for deterministic failure handling.
-* **`interfaces`**: Dependency injection contracts (e.g., `RateProvider`).
+func main() {
+	config := core.LedgerConfig{
+		FunctionalCurrency: "USD",
+		ClosedDate:         time.Date(2023, 12, 31, 23, 59, 59, 0, time.UTC),
+		RateTolerance:      decimal.Zero,
+	}
 
-The engine is storage-agnostic and framework-independent.
+	provider := interfaces.RateProviderFunc(func(ctx context.Context, req interfaces.RateRequest) (decimal.Decimal, error) {
+		return decimal.NewFromInt(1), nil
+	})
 
-## Concurrency Model
+	ledger, err := core.NewLedger(config, provider)
+	if err != nil {
+		panic(err)
+	}
 
-* **`Ledger`**: Safe for concurrent use. Instantiate one per configuration (for example, per entity or tenant).
-* **`TxBuilder`**: Not thread-safe. Intended for constructing a single transaction within a single execution scope.
-  `Ledger.ValidateTransaction` manages this lifecycle automatically.
+	debit, err := core.NewEntry(
+		"acc-cash",
+		decimal.RequireFromString("100.00"),
+		"USD",
+		decimal.NewFromInt(1),
+		"USD",
+	)
+	if err != nil {
+		panic(err)
+	}
+	credit, err := core.NewEntry(
+		"acc-revenue",
+		decimal.RequireFromString("-99.00"),
+		"USD",
+		decimal.NewFromInt(1),
+		"USD",
+	)
+	if err != nil {
+		panic(err)
+	}
 
-## Non-Goals
+	input := core.TransactionInput{
+		ID:            "tx-unbalanced",
+		EffectiveDate: time.Date(2024, 6, 1, 12, 0, 0, 0, time.UTC),
+		Entries:       []core.Entry{debit, credit},
+	}
+
+	_, err = ledger.ValidateTransaction(context.Background(), input)
+	if err == nil {
+		fmt.Println("unexpected success")
+		return
+	}
+
+	var validationErr *pkgerr.ValidationError
+	if errors.As(err, &validationErr) {
+		fmt.Printf("operation=%s field=%s entry=%d\n",
+			validationErr.Operation, validationErr.Field, validationErr.EntryIndex)
+	}
+	if errors.Is(err, pkgerr.ErrZeroSumViolation) {
+		fmt.Println("zero-sum validation failed as expected")
+	}
+}
+```
+
+## Guarantees
+
+Every successfully validated transaction satisfies:
+
+- **Non-empty and valid entries**: at least one entry; each entry has a bounded,
+  control-character-free account ID, valid and ratable currencies, a non-zero
+  amount at or below the currency's minor units, and a positive exchange rate.
+- **Exact zero-sum**: the decimal sum of all functional amounts is exactly zero.
+  Ties are not resolved with a tolerance.
+- **Period closure**: non-adjusting transactions at or before `ClosedDate` are
+  rejected. Adjusting events bypass only the period-closure rule.
+- **Currency consistency**: every entry's functional currency equals the
+  ledger's configured functional currency.
+- **As-of rate integrity**: foreign entries carry an effective date in each rate
+  request. Provider rates are positive and must match the entry rate within the
+  inclusive `RateTolerance`. The provider is called at most once per unique
+  `(base, quote, as-of)` request per validation.
+- **Immutable results**: `Transaction.Entries()` and `Transaction.Metadata()`
+  return defensive copies; the transaction exposes no exported mutable fields.
+- **Typed failures**: every failure matches a sentinel with `errors.Is` and
+  carries a `*ValidationError` with operation, entry index, field, and optional
+  cause.
+- **Determinism**: the same configuration, input, provider responses, and clock
+  produce the same transaction, including a UTC `PostedAt`.
+- **Metadata copying**: the top-level metadata map is copied, but metadata values
+  that are reference types remain caller-owned and shared.
+
+Validation order is fixed: configuration, transaction ID, effective date,
+non-empty entries, metadata keys, entry validity, currency consistency,
+zero-sum, period closure, and rate integrity.
+
+## Conformance profile
+
+NomLedger targets the **NomLedger Core Conformance Profile v1**. It is informed
+by IAS 21 (foreign currency), IAS 10 (adjusting events), and IFRS 9
+classification tags. It claims only that explicit validation profile. It makes
+**no blanket IFRS compliance claim** and does not perform measurement,
+classification tests, or financial reporting.
+
+## API summary
+
+### `pkg/core`
+
+- `LedgerConfig` with `FunctionalCurrency`, `ClosedDate`, and `RateTolerance`;
+  `Validate()` checks the configuration.
+- `NewLedger(config, provider, opts...)`, `WithClock`, `Config()`, and
+  `UpdateConfig(config)`; `NewLedger` and `UpdateConfig` return errors.
+  `NewTxBuilder` returns a builder and defers option errors to `Build`.
+- `Ledger.ValidateTransaction(ctx, TransactionInput)` is the canonical path.
+- `ValidateTransactionLegacy` preserves the pre-1.0 variadic call shape and is
+  deprecated.
+- `TransactionInput` carries ID, effective date, adjusting flag, entries, and
+  metadata.
+- `TxBuilder`/`NewTxBuilder`/`WithBuilderClock` provide an alternate construction
+  path that runs the same pipeline. A successful `Build` finalizes the builder;
+  later mutations are no-ops and a rebuild returns `ErrBuilderFinalized`.
+- `Entry`/`NewEntry`, `Account`/`NewAccount`, `Clock`/`ClockFunc`,
+  `AccountType`, and `MeasurementCategory` (including `FVOCI` and
+  `NotApplicable`).
+- `Transaction` accessors: `ID`, `EffectiveDate`, `IsAdjustingEvent`,
+  `PostedAt`, `Entries`, and `Metadata`.
+
+### `pkg/currency`
+
+- `Code` and `Currency` with case-insensitive `Lookup`, `All`, `MinorUnits`,
+  `Numeric`, `Name`, and `IsFund`.
+- The registry contains 178 active codes from SIX ISO 4217 List One published
+  2026-09-17. Unknown codes are rejected; there is no default precision.
+- `RoundingMode` and `Round` for HalfEven, HalfUp, HalfDown, Floor, Ceiling, and
+  Unnecessary rounding.
+- `Money`/`NewMoney` with currency-safe `Add`, `Sub`, `Neg`, `IsZero`, and
+  `String`.
+- `GetPrecision` and `RoundToPrecision` remain as deprecated compatibility
+  wrappers.
+
+### `pkg/errors`
+
+- Typed sentinels matched with `errors.Is`, including `ErrZeroSumViolation`,
+  `ErrPeriodClosed`, `ErrCurrencyMismatch`, `ErrRateProvider`,
+  `ErrInvalidPrecision`, `ErrUnknownCurrency`, and `ErrInvalidConfiguration`.
+- `ValidationError` plus `NewValidationError` and `NewEntryValidationError` for
+  structured context extracted with `errors.As`.
+
+### `pkg/interfaces`
+
+- `RateRequest` carries `Base` (transaction currency), `Quote` (functional
+  currency), and the UTC `AsOf` effective date.
+- `RateProvider.GetRate(ctx, req)` is context- and date-aware.
+- `RateProviderFunc` adapts an ordinary function to `RateProvider`.
+
+## Migration from pre-1.0
+
+- The module path is `github.com/Emin-ACIKGOZ/nomledger`.
+- `NewLedger` and `UpdateConfig` now return `(*Ledger, error)`. `NewTxBuilder`
+  still returns only `*TxBuilder`; builder option errors surface from `Build`.
+- `RateProvider` now uses `GetRate(ctx context.Context, req RateRequest)`; the
+  old `GetRate(base, quote string)` method is gone.
+- Use `ValidateTransaction(ctx, TransactionInput)`; the legacy variadic method
+  is deprecated.
+- Entry construction is strict: amounts beyond the transaction currency's minor
+  units, zero amounts, non-positive rates, and non-one same-currency rates are
+  rejected. Non-zero amounts that round to zero in the functional currency are
+  also rejected.
+- `MeasurementCategory` adds `NotApplicable` and `FVOCI`.
+- The currency registry contains 178 active codes. Unknown currencies are no
+  longer given a default precision.
+- Provider errors are wrapped with `ErrRateProvider` and preserve their cause;
+  they are no longer returned verbatim.
+- A builder is final after one successful `Build`.
+
+## Concurrency
+
+- `Ledger` is safe for concurrent use.
+- `TxBuilder` is not safe for concurrent use and should live within one
+  execution scope.
+- A shared `RateProvider` and `Clock` must be safe for concurrent use. The
+  default `time.Now` clock is safe.
+
+## Metadata copying
+
+Metadata is non-normative. The top-level map is shallowly copied on input and
+output, so callers cannot add, remove, or replace keys in a transaction through
+the original map or through `Metadata()`. Values that are reference types (for
+example pointers, maps, or slices) remain caller-owned and may still be mutated
+by their owner. This shallow-copy behavior is intentional.
+
+## Non-goals
 
 NomLedger intentionally does not provide:
 
-* Persistence or database integration
-* Reporting, balances, or aggregation logic
-* Natural balance enforcement by account type
-* Currency discovery or FX sourcing mechanisms
+- Persistence or database integration
+- Reporting, balances, or aggregation logic
+- Natural-balance enforcement by account type
+- FX sourcing or rate-provider implementations
+- Tax calculations or full IFRS measurement
+- Historical currencies
+- An account registry or account storage
+- Duplicate detection
+- Serialization codecs
+- Multi-tenancy
+- Full IFRS compliance
 
-## Use Cases
+## Documentation
 
-* Financial backends requiring deterministic validation before persistence
-* Accounting systems enforcing IFRS-aligned invariants
-* Event-sourced architectures with strict command validation
-* High-integrity transaction processing pipelines
+API documentation is available on demand through `go doc`:
+
+```bash
+go doc github.com/Emin-ACIKGOZ/nomledger/pkg/core
+go doc github.com/Emin-ACIKGOZ/nomledger/pkg/currency
+go doc github.com/Emin-ACIKGOZ/nomledger/pkg/errors
+go doc github.com/Emin-ACIKGOZ/nomledger/pkg/interfaces
+```
+
+The stale generated `documentation.txt` snapshot has been removed.
 
 ## License
 

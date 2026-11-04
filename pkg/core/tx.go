@@ -76,11 +76,16 @@ func (t Transaction) Metadata() map[string]any {
 // is shallow: metadata values that are reference types remain caller-owned and
 // shared.
 type TransactionInput struct {
-	ID               string
-	EffectiveDate    time.Time
+	// ID is the transaction identifier.
+	ID string
+	// EffectiveDate is the transaction effective date; it is normalized to UTC.
+	EffectiveDate time.Time
+	// IsAdjustingEvent marks the transaction as an IAS 10 adjusting event.
 	IsAdjustingEvent bool
-	Entries          []Entry
-	Metadata         map[string]any
+	// Entries are the transaction line items; the slice is copied on validation.
+	Entries []Entry
+	// Metadata is non-normative data; the map is shallowly copied on validation.
+	Metadata map[string]any
 }
 
 // TxBuilder accumulates state for constructing a Transaction.
