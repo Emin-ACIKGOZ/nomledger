@@ -1,0 +1,7 @@
+# SIX ISO 4217 List Two: funds codes registered with the Maintenance Agency.
+# Source: https://www.six-group.com/dam/download/financial-information/data-center/iso-currrency/lists/list-two.doc
+# Retrieved: 2026-11-04
+# SHA-256: 2c59a66ec930fd72332b7aebb6f5d940205497ca4ab39c6d34a076af2d70468c
+#
+# This file is derived from the .doc artifact; the line below records the codes.
+XAD BOV CLF COU MXV CHW CHE USN UYI UYW
