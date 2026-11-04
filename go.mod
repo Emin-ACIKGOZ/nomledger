@@ -1,4 +1,4 @@
-module nomledger
+module github.com/Emin-ACIKGOZ/nomledger
 
 go 1.22.2
 

@@ -4,8 +4,8 @@ package core
 
 import (
 	"errors"
-	"nomledger/pkg/currency"
-	pkgerr "nomledger/pkg/errors"
+	"github.com/Emin-ACIKGOZ/nomledger/pkg/currency"
+	pkgerr "github.com/Emin-ACIKGOZ/nomledger/pkg/errors"
 
 	"github.com/shopspring/decimal"
 )

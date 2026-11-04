@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"nomledger/pkg/core"
+	"github.com/Emin-ACIKGOZ/nomledger/pkg/core"
 
 	"github.com/shopspring/decimal"
 )

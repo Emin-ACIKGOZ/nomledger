@@ -4,8 +4,8 @@ package core_test
 
 import (
 	"errors"
-	"nomledger/pkg/core"
-	pkgerr "nomledger/pkg/errors"
+	"github.com/Emin-ACIKGOZ/nomledger/pkg/core"
+	pkgerr "github.com/Emin-ACIKGOZ/nomledger/pkg/errors"
 	"testing"
 
 	"github.com/shopspring/decimal"

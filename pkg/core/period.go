@@ -5,7 +5,7 @@ package core
 import (
 	"time"
 
-	pkgerr "nomledger/pkg/errors"
+	pkgerr "github.com/Emin-ACIKGOZ/nomledger/pkg/errors"
 
 	"github.com/shopspring/decimal"
 )

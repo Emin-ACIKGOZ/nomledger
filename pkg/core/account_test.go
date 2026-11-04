@@ -3,7 +3,7 @@
 package core_test
 
 import (
-	"nomledger/pkg/core"
+	"github.com/Emin-ACIKGOZ/nomledger/pkg/core"
 	"testing"
 )
 

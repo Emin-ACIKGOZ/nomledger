@@ -3,7 +3,7 @@
 package currency
 
 import (
-	"nomledger/pkg/errors"
+	"github.com/Emin-ACIKGOZ/nomledger/pkg/errors"
 	"strings"
 
 	"github.com/shopspring/decimal"

@@ -3,7 +3,7 @@
 package currency_test
 
 import (
-	"nomledger/pkg/currency"
+	"github.com/Emin-ACIKGOZ/nomledger/pkg/currency"
 	"testing"
 
 	"github.com/shopspring/decimal"

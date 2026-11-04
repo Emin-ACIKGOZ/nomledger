@@ -1,4 +1,4 @@
-package core // import "nomledger/pkg/core"
+package core // import "github.com/Emin-ACIKGOZ/nomledger/pkg/core"
 
 Package core provides the normative validation engine for NomLedger.
 
@@ -247,7 +247,7 @@ func (b *TxBuilder) WithMetadata(meta map[string]interface{}) *TxBuilder
     Mutating values inside the map after passing them here may affect the
     builder if they are reference types.
 
-package currency // import "nomledger/pkg/currency"
+package currency // import "github.com/Emin-ACIKGOZ/nomledger/pkg/currency"
 
 Package currency provides ISO 4217 precision arithmetic and rounding rules.
 
@@ -272,7 +272,7 @@ func RoundToPrecision(amount decimal.Decimal, currencyCode string) decimal.Decim
     It utilizes Banker's Rounding (Half-to-Even) to minimize bias in accumulated
     operations.
 
-package errors // import "nomledger/pkg/errors"
+package errors // import "github.com/Emin-ACIKGOZ/nomledger/pkg/errors"
 
 Package errors defines the taxonomy of typed faults returned by the validation
 engine.
@@ -316,7 +316,7 @@ var (
 )
     Typed Error Taxonomy as defined in the Technical Design.
 
-package interfaces // import "nomledger/pkg/interfaces"
+package interfaces // import "github.com/Emin-ACIKGOZ/nomledger/pkg/interfaces"
 
 Package interfaces defines the contracts required for external dependency
 injection.

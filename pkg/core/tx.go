@@ -5,8 +5,8 @@ package core
 import (
 	"time"
 
-	pkgerr "nomledger/pkg/errors" // Alias package errors to avoid collision
-	"nomledger/pkg/interfaces"
+	pkgerr "github.com/Emin-ACIKGOZ/nomledger/pkg/errors" // Alias package errors to avoid collision
+	"github.com/Emin-ACIKGOZ/nomledger/pkg/interfaces"
 
 	"github.com/shopspring/decimal"
 )

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"nomledger/pkg/core"
-	pkgerr "nomledger/pkg/errors"
+	"github.com/Emin-ACIKGOZ/nomledger/pkg/core"
+	pkgerr "github.com/Emin-ACIKGOZ/nomledger/pkg/errors"
 
 	"github.com/shopspring/decimal"
 )

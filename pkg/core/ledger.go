@@ -5,7 +5,7 @@ package core
 import (
 	"time"
 
-	"nomledger/pkg/interfaces"
+	"github.com/Emin-ACIKGOZ/nomledger/pkg/interfaces"
 )
 
 // Ledger is the concurrency-safe entry point for the validation engine.
