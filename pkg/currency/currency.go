@@ -117,16 +117,7 @@ func GetPrecision(code string) (int32, bool) {
 //
 // Deprecated: use Round with RoundHalfEven, or NewMoney, instead.
 func RoundToPrecision(amount decimal.Decimal, currencyCode string) (decimal.Decimal, error) {
-	currency, err := Lookup(currencyCode)
-	if err != nil {
-		return decimal.Zero, err
-	}
-
-	minorUnits, ratable := currency.MinorUnits()
-	if !ratable {
-		return decimal.Zero, pkgerr.ErrCurrencyNotRatable
-	}
-	return amount.RoundBank(minorUnits), nil
+	return Round(amount, Code(currencyCode), RoundHalfEven)
 }
 
 func validCode(code string) bool {

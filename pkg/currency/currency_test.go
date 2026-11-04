@@ -37,6 +37,7 @@ const (
 	codeUSDMixedCase = "UsD"
 	codeJPY          = "JPY"
 	codeBHD          = "BHD"
+	codeCLF          = "CLF"
 	codeXAU          = "XAU"
 	codeXDR          = "XDR"
 	codeBGN          = "BGN"
@@ -294,7 +295,7 @@ func assertRegistryCounts(t *testing.T, all []currency.Currency) {
 // TestLookupNormalisation: case folding plus strict malformed input.
 func TestLookupNormalisation(t *testing.T) {
 	t.Run("normalises case", func(t *testing.T) {
-		for _, input := range []string{"usd", codeUSDMixedCase, codeUSD} {
+		for _, input := range []string{codeUSDLower, codeUSDMixedCase, codeUSD} {
 			c, err := currency.Lookup(input)
 			if err != nil {
 				t.Fatalf("Lookup(%q): %v", input, err)
@@ -412,12 +413,12 @@ func TestCanonicalCodes(t *testing.T) {
 	}
 
 	zeroPadded := map[string]string{
-		"ALL": "008",
-		"AMD": "051",
-		"AUD": "036",
-		"BBD": "052",
-		"BHD": "048",
-		"BDT": "050",
+		"ALL":   "008",
+		"AMD":   "051",
+		"AUD":   "036",
+		"BBD":   "052",
+		codeBHD: "048",
+		"BDT":   "050",
 	}
 	for code, wantNumeric := range zeroPadded {
 		c, err := currency.Lookup(code)

@@ -15,7 +15,7 @@ import (
 // well-formed unknown input returns ErrUnknownCurrency without panicking.
 func FuzzLookup(f *testing.F) {
 	seeds := []string{
-		codeUSD, "usd", codeUSDMixedCase, codeUnknown, "", " USD", "US", "US1", "БГЛ",
+		codeUSD, codeUSDLower, codeUSDMixedCase, codeUnknown, "", " USD", "US", "US1", "БГЛ",
 		codeXAU, codeXDR, codeBGN, codeJPY, "ZZZ", "123",
 	}
 	for _, seed := range seeds {

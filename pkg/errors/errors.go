@@ -48,4 +48,11 @@ var (
 	// ErrCurrencyNotRatable indicates the currency has no defined minor units
 	// and therefore cannot be used for monetary amounts.
 	ErrCurrencyNotRatable = errors.New("currency has no defined minor units")
+
+	// ErrInvalidRoundingMode indicates the requested rounding mode is unknown.
+	ErrInvalidRoundingMode = errors.New("invalid rounding mode")
+
+	// ErrInexactRounding indicates an unnecessary-rounding request would change
+	// the numeric value.
+	ErrInexactRounding = errors.New("rounding would change the value")
 )
