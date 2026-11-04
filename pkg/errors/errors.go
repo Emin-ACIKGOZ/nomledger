@@ -29,6 +29,18 @@ var (
 	// Zero-entry transactions are strictly invalid.
 	ErrEmptyTransaction = errors.New("transaction must contain at least one entry")
 
+	// ErrInvalidAccountID indicates the account ID is empty, too long, or
+	// contains a control character.
+	ErrInvalidAccountID = errors.New("invalid account ID")
+
+	// ErrInvalidAccountType indicates the account type is not one of the
+	// supported reporting classifications.
+	ErrInvalidAccountType = errors.New("invalid account type")
+
+	// ErrInvalidMeasurementCategory indicates the measurement category is not
+	// one of the supported IFRS 9 tags.
+	ErrInvalidMeasurementCategory = errors.New("invalid measurement category")
+
 	// ErrInvalidExchangeRate indicates a logic error in the exchange rate.
 	// Both entry-provided rates and provider-returned rates must be strictly positive.
 	// Zero or negative rates are invalid.
