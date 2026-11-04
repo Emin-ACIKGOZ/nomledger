@@ -29,6 +29,16 @@ var (
 	// Zero-entry transactions are strictly invalid.
 	ErrEmptyTransaction = errors.New("transaction must contain at least one entry")
 
+	// ErrZeroAmount indicates a transaction amount is zero.
+	ErrZeroAmount = errors.New("transaction amount must be non-zero")
+
+	// ErrFunctionalAmountZero indicates a non-zero transaction amount rounds to
+	// zero in the functional currency.
+	ErrFunctionalAmountZero = errors.New("functional amount rounds to zero")
+
+	// ErrInvalidEntry indicates a zero-value or internally inconsistent entry.
+	ErrInvalidEntry = errors.New("invalid entry")
+
 	// ErrInvalidAccountID indicates the account ID is empty, too long, or
 	// contains a control character.
 	ErrInvalidAccountID = errors.New("invalid account ID")
