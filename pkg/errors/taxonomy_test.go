@@ -272,7 +272,7 @@ func TestErrorTaxonomy(t *testing.T) {
 			want: pkgerr.ErrRateProvider, wantEntryIndex: 0,
 		},
 		{
-			id: "ERR-018", name: "context cancelled",
+			id: "ERR-018", name: "context canceled",
 			trigger: func(t *testing.T) error {
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel()

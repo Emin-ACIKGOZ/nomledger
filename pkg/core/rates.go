@@ -95,7 +95,7 @@ func validateEntryRate(
 }
 
 // resolveRate returns a cached or freshly fetched provider rate. If the
-// provider fails while the context is also cancelled, both the provider error
+// provider fails while the context is also canceled, both the provider error
 // and the context error are preserved in the returned ValidationError's cause.
 func resolveRate(
 	ctx context.Context,

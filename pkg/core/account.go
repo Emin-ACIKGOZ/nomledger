@@ -39,7 +39,7 @@ const (
 //
 // These are declarative markers used for downstream reporting and valuation
 // logic. The library stores these tags but does not enforce business-model
-// tests, amortisation logic, or any measurement treatment.
+// tests, amortization logic, or any measurement treatment.
 type MeasurementCategory int8
 
 const (

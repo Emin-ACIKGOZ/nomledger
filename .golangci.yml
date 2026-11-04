@@ -1,23 +1,14 @@
-# .golangci.yml - Standardized Go Linter Configuration
+# SPDX-License-Identifier: MIT
+version: "2"
 
 run:
-  # Default timeout for linter
   timeout: 5m
-  # Include test files
   tests: true
 
-output:
-  print-issued-lines: true
-  print-linter-name: true
-
-linters-settings:
-  misspell:
-    locale: US
-
 linters:
-  disable-all: true
+  default: none
   enable:
-    # --- Core & Bugs ---
+    # Core and correctness
     - bodyclose
     - copyloopvar
     - errcheck
@@ -28,7 +19,7 @@ linters:
     - staticcheck
     - unused
 
-    # --- Style, Performance & Idioms ---
+    # Style, performance, and idioms
     - goconst
     - ineffassign
     - misspell
@@ -38,14 +29,19 @@ linters:
     - revive
     - whitespace
 
-    # --- Complexity & Meta ---
+    # Complexity and meta
     - cyclop
     - nolintlint
 
-    # --- Security ---
+    # Security
     - gosec
 
+  settings:
+    misspell:
+      locale: US
+    goconst:
+      ignore-tests: true
+
 issues:
-  exclude-use-default: false
   max-issues-per-linter: 0
   max-same-issues: 0

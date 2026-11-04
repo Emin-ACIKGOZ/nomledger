@@ -99,7 +99,7 @@ func TestMoneyArithmetic(t *testing.T) {
 	t.Run("sub", testMoneySub)
 	t.Run("result scale does not exceed minor units", testMoneyResultScale)
 	t.Run("cross-currency mismatch", testMoneyCrossCurrencyMismatch)
-	t.Run("mixed case codes normalise", testMoneyMixedCaseNormalise)
+	t.Run("mixed case codes normalize", testMoneyMixedCaseNormalize)
 	t.Run("neg and zero", testMoneyNegAndZero)
 	t.Run("positive exponent operands", testMoneyPositiveExponentOperands)
 }
@@ -165,7 +165,7 @@ func testMoneyCrossCurrencyMismatch(t *testing.T) {
 	}
 }
 
-func testMoneyMixedCaseNormalise(t *testing.T) {
+func testMoneyMixedCaseNormalize(t *testing.T) {
 	t.Helper()
 	lower := mustMoney(t, usdOne, codeUSDLower)
 	mixed := mustMoney(t, "2.00", codeUSDMixedCase)

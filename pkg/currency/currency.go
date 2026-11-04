@@ -46,7 +46,7 @@ func init() {
 
 // Lookup returns the registry entry for a three-letter ISO 4217 code.
 //
-// Lookup accepts any ASCII letter case and normalises the result to the
+// Lookup accepts any ASCII letter case and normalizes the result to the
 // canonical uppercase code. It validates the code before consulting the
 // registry and returns ErrInvalidCurrencyCode for malformed input or
 // ErrUnknownCurrency for well-formed codes that are not active. Ratability is

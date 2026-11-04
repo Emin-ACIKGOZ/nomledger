@@ -107,7 +107,7 @@ func TestAdversarialInputs(t *testing.T) {
 			},
 		},
 		{
-			name: "cancelled context",
+			name: "canceled context",
 			call: func() error {
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel()

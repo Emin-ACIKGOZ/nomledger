@@ -131,7 +131,7 @@ func TestLedgerConfigFunctionalCurrency(t *testing.T) {
 	}
 
 	for _, input := range []string{codeUSDLower, codeUSDMixed, codeUSD} {
-		t.Run("normalised "+input, func(t *testing.T) {
+		t.Run("normalized "+input, func(t *testing.T) {
 			ledger, err := core.NewLedger(core.LedgerConfig{FunctionalCurrency: input}, mockRateProvider{})
 			if err != nil {
 				t.Fatalf("NewLedger: %v", err)
@@ -227,7 +227,7 @@ func TestLedgerConfigTolerance(t *testing.T) {
 // TestLedgerConfigClosedDate.
 func TestLedgerConfigClosedDate(t *testing.T) {
 	t.Run("zero closed date accepted", testZeroClosedDate)
-	t.Run("non-UTC closed date normalised", testNonUTCClosedDate)
+	t.Run("non-UTC closed date normalized", testNonUTCClosedDate)
 	t.Run("period check compares by instant", testPeriodComparesByInstant)
 }
 
@@ -359,7 +359,7 @@ func TestUpdateConfigAndConfigCopy(t *testing.T) {
 	}
 
 	assertConfigCopyIndependent(t, ledger)
-	updated := mustUpdateConfigNormalised(t, ledger)
+	updated := mustUpdateConfigNormalized(t, ledger)
 
 	t.Run("same provider retained", func(t *testing.T) {
 		assertUpdatedUsesProvider(t, updated)
@@ -387,7 +387,7 @@ func assertConfigCopyIndependent(t *testing.T, ledger *core.Ledger) {
 	}
 }
 
-func mustUpdateConfigNormalised(t *testing.T, ledger *core.Ledger) *core.Ledger {
+func mustUpdateConfigNormalized(t *testing.T, ledger *core.Ledger) *core.Ledger {
 	t.Helper()
 	newConfig := core.LedgerConfig{
 		FunctionalCurrency: "eur",

@@ -8,7 +8,7 @@ import "time"
 //
 // The default clock is time.Now. Implementations must be safe for concurrent
 // use when the ledger is shared; time.Now is. Values read from a clock are
-// normalised to UTC before they are stored in Transaction.PostedAt.
+// normalized to UTC before they are stored in Transaction.PostedAt.
 type Clock interface {
 	Now() time.Time
 }

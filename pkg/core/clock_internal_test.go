@@ -87,7 +87,7 @@ func TestCountingClockInternal(t *testing.T) {
 	t.Run("builder success reads once", testCountingBuilderSuccess)
 	t.Run("legacy success reads once", testCountingLegacySuccess)
 	t.Run("zero-sum failure reads zero", testCountingZeroSumFailure)
-	t.Run("cancelled context reads zero", testCountingCancelledContext)
+	t.Run("canceled context reads zero", testCountingCanceledContext)
 	t.Run("option error reads zero", testCountingOptionError)
 	t.Run("finalized rebuild reads zero", testCountingFinalizedRebuild)
 }
@@ -192,7 +192,7 @@ func testCountingZeroSumFailure(t *testing.T) {
 	}
 }
 
-func testCountingCancelledContext(t *testing.T) {
+func testCountingCanceledContext(t *testing.T) {
 	t.Helper()
 	clock := &countingClock{now: clockTestTime()}
 	ledger, err := NewLedger(
@@ -206,7 +206,7 @@ func testCountingCancelledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	_, err = ledger.ValidateTransaction(ctx, TransactionInput{
-		ID:            "clock-cancelled",
+		ID:            "clock-canceled",
 		EffectiveDate: time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC),
 		Entries:       mustCountingClockEntries(t),
 	})

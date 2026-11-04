@@ -109,7 +109,7 @@ func TestTransactionEffectiveDateValidation(t *testing.T) {
 			fieldEffectiveDate, transactionBuildOperation)
 	})
 
-	t.Run("non-UTC date normalised", func(t *testing.T) {
+	t.Run("non-UTC date normalized", func(t *testing.T) {
 		zone := time.FixedZone("EST", -5*60*60)
 		effective := time.Date(2024, 1, 15, 12, 34, 56, 123456789, zone)
 		transaction, err := buildTransactionWith(t, config, txID, effective, false, nil, entries)

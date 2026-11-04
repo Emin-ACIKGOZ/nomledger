@@ -44,7 +44,7 @@ type Transaction struct {
 func (t Transaction) ID() string { return t.id }
 
 // EffectiveDate returns the date on which the transaction impacts the ledger,
-// normalised to UTC.
+// normalized to UTC.
 func (t Transaction) EffectiveDate() time.Time { return t.effectiveDate }
 
 // IsAdjustingEvent reports whether the transaction is an IAS 10 adjusting event.
@@ -91,7 +91,7 @@ type TransactionInput struct {
 // TxBuilder accumulates state for constructing a Transaction.
 //
 // A builder starts accumulating, a failed Build leaves it retryable, and a
-// successful Build finalizes it. After finalisation, AddEntry, SetAdjustingEvent,
+// successful Build finalizes it. After finalization, AddEntry, SetAdjustingEvent,
 // and WithMetadata are no-ops, and Build returns ErrBuilderFinalized. It is
 // stateful and not safe for concurrent use. TxBuilder.Build runs the same
 // validation pipeline as Ledger.ValidateTransaction.

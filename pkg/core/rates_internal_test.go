@@ -94,13 +94,13 @@ func mustForeignRateEntries(t *testing.T) []Entry {
 
 // TestContextCancellationDuringProviderCall.
 func TestContextCancellationDuringProviderCall(t *testing.T) {
-	t.Run("already cancelled before first call", testCancelledBeforeCall)
+	t.Run("already canceled before first call", testCanceledBeforeCall)
 	t.Run("non-positive entry rate", testNonPositiveEntryRate)
 	t.Run("provider cancels during call", testProviderCancelsDuringCall)
 	t.Run("provider error and cancellation are both preserved", testProviderErrorWithCancellation)
 }
 
-func testCancelledBeforeCall(t *testing.T) {
+func testCanceledBeforeCall(t *testing.T) {
 	t.Helper()
 	asOf := time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC)
 	tolerance := decimal.Zero

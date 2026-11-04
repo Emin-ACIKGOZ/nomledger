@@ -167,7 +167,7 @@ func TestRoundModes(t *testing.T) {
 		{"BHD Unnecessary excess zero", "1.2340", codeBHD, currency.RoundUnnecessary, bhdOneTwoThreeFour, nil},
 		{"BHD Unnecessary inexact", bhdInexactAmount, codeBHD, currency.RoundUnnecessary, "", pkgerr.ErrInexactRounding},
 
-		// Lookup normalisation applies to Round codes too.
+		// Lookup normalization applies to Round codes too.
 		{"USD HalfEven lowercase code", amtTieEven, codeUSDLower, currency.RoundHalfEven, usdOne, nil},
 
 		// Invalid modes and currency lookup failures.

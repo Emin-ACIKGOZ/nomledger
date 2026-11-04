@@ -292,9 +292,9 @@ func assertRegistryCounts(t *testing.T, all []currency.Currency) {
 	assertMinorCounts(t, minorCounts, nonRatable)
 }
 
-// TestLookupNormalisation: case folding plus strict malformed input.
-func TestLookupNormalisation(t *testing.T) {
-	t.Run("normalises case", func(t *testing.T) {
+// TestLookupNormalization: case folding plus strict malformed input.
+func TestLookupNormalization(t *testing.T) {
+	t.Run("normalizes case", func(t *testing.T) {
 		for _, input := range []string{codeUSDLower, codeUSDMixedCase, codeUSD} {
 			c, err := currency.Lookup(input)
 			if err != nil {

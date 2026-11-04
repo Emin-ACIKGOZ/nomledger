@@ -1,0 +1,103 @@
+pkg/currency type Code string
+pkg/currency type Currency struct
+pkg/currency func Lookup func(code string) (Currency, error)
+pkg/currency func All func() []Currency
+pkg/currency method Currency.Code func() Code
+pkg/currency method Currency.Numeric func() string
+pkg/currency method Currency.MinorUnits func() (int32, bool)
+pkg/currency method Currency.Name func() string
+pkg/currency method Currency.IsFund func() bool
+pkg/currency func GetPrecision func(code string) (int32, bool)
+pkg/currency func RoundToPrecision func(amount decimal.Decimal, currencyCode string) (decimal.Decimal, error)
+pkg/currency type Money struct
+pkg/currency func NewMoney func(amount decimal.Decimal, code Code) (Money, error)
+pkg/currency method Money.Amount func() decimal.Decimal
+pkg/currency method Money.Currency func() Code
+pkg/currency method Money.Add func(other Money) (Money, error)
+pkg/currency method Money.Sub func(other Money) (Money, error)
+pkg/currency method Money.Neg func() Money
+pkg/currency method Money.IsZero func() bool
+pkg/currency method Money.String func() string
+pkg/currency type RoundingMode uint8
+pkg/currency const ( RoundHalfEven RoundingMode = iota RoundHalfUp RoundHalfDown RoundFloor RoundCeiling RoundUnnecessary)
+pkg/currency func Round func(amount decimal.Decimal, code Code, mode RoundingMode) (decimal.Decimal, error)
+pkg/core type AccountType int8
+pkg/core const ( Asset AccountType = iota + 1 Liability Equity Income Expense)
+pkg/core type MeasurementCategory int8
+pkg/core const ( NotApplicable MeasurementCategory = iota AmortizedCost FVTPL FVOCI)
+pkg/core type Account struct
+pkg/core func NewAccount func(id string, typ AccountType, cat MeasurementCategory, currencyCode string, metadata map[string]any) (Account, error)
+pkg/core method Account.ID func() string
+pkg/core method Account.Type func() AccountType
+pkg/core method Account.Category func() MeasurementCategory
+pkg/core method Account.CurrencyCode func() string
+pkg/core method Account.Metadata func() map[string]any
+pkg/core method Account.Validate func() error
+pkg/core type Clock interface
+pkg/core type Clock method Now func() time.Time
+pkg/core type ClockFunc func() time.Time
+pkg/core method ClockFunc.Now func() time.Time
+pkg/core type LedgerOption func(*ledgerOptions) error
+pkg/core func WithClock func(c Clock) LedgerOption
+pkg/core type BuilderOption func(*builderOptions) error
+pkg/core func WithBuilderClock func(c Clock) BuilderOption
+pkg/core type Entry struct
+pkg/core func NewEntry func(accountID string, txAmount decimal.Decimal, txCurrency string, exchangeRate decimal.Decimal, functionalCurrency string) (Entry, error)
+pkg/core method Entry.AccountID func() string
+pkg/core method Entry.TxMoney func() currency.Money
+pkg/core method Entry.TxAmount func() decimal.Decimal
+pkg/core method Entry.TxCurrency func() string
+pkg/core method Entry.ExchangeRate func() decimal.Decimal
+pkg/core method Entry.FunctionalMoney func() currency.Money
+pkg/core method Entry.FunctionalAmount func() decimal.Decimal
+pkg/core method Entry.FunctionalCurrency func() string
+pkg/core method Entry.Validate func() error
+pkg/core type Ledger struct
+pkg/core func NewLedger func(config LedgerConfig, provider interfaces.RateProvider, opts ...LedgerOption) (*Ledger, error)
+pkg/core method *Ledger.ValidateTransaction func(ctx context.Context, in TransactionInput) (Transaction, error)
+pkg/core method *Ledger.ValidateTransactionLegacy func(id string, effectiveDate time.Time, isAdjustingEvent bool, entries ...Entry) (Transaction, error)
+pkg/core method *Ledger.Config func() LedgerConfig
+pkg/core method *Ledger.UpdateConfig func(config LedgerConfig) (*Ledger, error)
+pkg/core type LedgerConfig struct
+pkg/core type LedgerConfig field ClosedDate time.Time
+pkg/core type LedgerConfig field FunctionalCurrency string
+pkg/core type LedgerConfig field RateTolerance decimal.Decimal
+pkg/core method LedgerConfig.Validate func() error
+pkg/core type Transaction struct
+pkg/core method Transaction.ID func() string
+pkg/core method Transaction.EffectiveDate func() time.Time
+pkg/core method Transaction.IsAdjustingEvent func() bool
+pkg/core method Transaction.PostedAt func() time.Time
+pkg/core method Transaction.Entries func() []Entry
+pkg/core method Transaction.Metadata func() map[string]any
+pkg/core type TransactionInput struct
+pkg/core type TransactionInput field ID string
+pkg/core type TransactionInput field EffectiveDate time.Time
+pkg/core type TransactionInput field IsAdjustingEvent bool
+pkg/core type TransactionInput field Entries []Entry
+pkg/core type TransactionInput field Metadata map[string]any
+pkg/core type TxBuilder struct
+pkg/core func NewTxBuilder func(id string, date time.Time, config LedgerConfig, rp interfaces.RateProvider, opts ...BuilderOption) *TxBuilder
+pkg/core method *TxBuilder.AddEntry func(e Entry) *TxBuilder
+pkg/core method *TxBuilder.SetAdjustingEvent func(isAdjusting bool) *TxBuilder
+pkg/core method *TxBuilder.WithMetadata func(meta map[string]any) *TxBuilder
+pkg/core method *TxBuilder.Build func() (Transaction, error)
+pkg/errors var ( ErrZeroSumViolation = errors.New("transaction does not sum to zero") ErrPeriodClosed = errors.New("effective date falls in closed period") ErrRateDeviation = errors.New("exchange rate exceeds tolerance") ErrRateProvider = errors.New("rate provider error") ErrInvalidPrecision = errors.New("amount exceeds currency precision") ErrCurrencyMismatch = errors.New("entry functional currency does not match ledger") ErrEmptyTransaction = errors.New("transaction must contain at least one entry") ErrZeroAmount = errors.New("transaction amount must be non-zero") ErrFunctionalAmountZero = errors.New("functional amount rounds to zero") ErrInvalidEntry = errors.New("invalid entry") ErrNilRateProvider = errors.New("rate provider must not be nil") ErrInvalidTransactionID = errors.New("invalid transaction ID") ErrInvalidEffectiveDate = errors.New("invalid effective date") ErrInvalidMetadata = errors.New("invalid metadata") ErrInvalidAccountID = errors.New("invalid account ID") ErrInvalidAccountType = errors.New("invalid account type") ErrInvalidMeasurementCategory = errors.New("invalid measurement category") ErrInvalidExchangeRate = errors.New("exchange rate must be strictly positive") ErrInvalidConfiguration = errors.New("invalid ledger configuration") ErrUnknownCurrency = errors.New("unknown or unsupported currency code") ErrInvalidCurrencyCode = errors.New("currency code must be exactly three ASCII letters") ErrCurrencyNotRatable = errors.New("currency has no defined minor units") ErrInvalidRoundingMode = errors.New("invalid rounding mode") ErrInexactRounding = errors.New("rounding would change the value") ErrBuilderFinalized = errors.New("builder is already finalized"))
+pkg/errors type ValidationError struct
+pkg/errors type ValidationError field Code error
+pkg/errors type ValidationError field Operation string
+pkg/errors type ValidationError field EntryIndex int
+pkg/errors type ValidationError field Field string
+pkg/errors type ValidationError field Cause error
+pkg/errors method *ValidationError.Error func() string
+pkg/errors method *ValidationError.Unwrap func() error
+pkg/errors func NewValidationError func(code error, operation, field string, cause error) *ValidationError
+pkg/errors func NewEntryValidationError func(code error, operation string, entryIndex int, field string, cause error) *ValidationError
+pkg/interfaces type RateRequest struct
+pkg/interfaces type RateRequest field Base currency.Code
+pkg/interfaces type RateRequest field Quote currency.Code
+pkg/interfaces type RateRequest field AsOf time.Time
+pkg/interfaces type RateProvider interface
+pkg/interfaces type RateProvider method GetRate func(ctx context.Context, req RateRequest) (decimal.Decimal, error)
+pkg/interfaces type RateProviderFunc func(ctx context.Context, req RateRequest) (decimal.Decimal, error)
+pkg/interfaces method RateProviderFunc.GetRate func(ctx context.Context, req RateRequest) (decimal.Decimal, error)

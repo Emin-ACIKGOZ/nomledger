@@ -24,7 +24,7 @@ type Ledger struct {
 
 // NewLedger constructs a new Ledger instance.
 //
-// It validates and normalises the configuration before accepting it, applies
+// It validates and normalizes the configuration before accepting it, applies
 // options, defaults a nil clock to time.Now, and rejects a nil rate provider
 // with ErrNilRateProvider. Option failures and other errors are *ValidationError
 // values with Operation "NewLedger" and Field "clock", "config", or "provider".
@@ -61,7 +61,7 @@ func NewLedger(config LedgerConfig, provider interfaces.RateProvider, opts ...Le
 // ValidateTransaction validates a TransactionInput and returns an immutable
 // Transaction. It is the canonical validation path.
 //
-// A nil context is treated as context.Background(). A cancelled context returns
+// A nil context is treated as context.Background(). A canceled context returns
 // a *ValidationError matching both ErrRateProvider and the context error before
 // any validation work, including for same-currency-only transactions. The input
 // entries and metadata map are copied, so later mutation of the input cannot
@@ -102,7 +102,7 @@ func (l *Ledger) ValidateTransactionLegacy(
 	})
 }
 
-// Config returns a copy of the ledger's normalised configuration.
+// Config returns a copy of the ledger's normalized configuration.
 func (l *Ledger) Config() LedgerConfig {
 	return l.config
 }

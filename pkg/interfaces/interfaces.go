@@ -30,7 +30,7 @@ type RateRequest struct {
 // validation and MUST be thread-safe when the ledger is shared concurrently.
 type RateProvider interface {
 	// GetRate returns the exchange rate for a request, or an error if the rate
-	// cannot be determined. Implementations should honour ctx cancellation and
+	// cannot be determined. Implementations should honor ctx cancellation and
 	// deadlines.
 	GetRate(ctx context.Context, req RateRequest) (decimal.Decimal, error)
 }
