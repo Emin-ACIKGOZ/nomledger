@@ -80,14 +80,14 @@ func TestTxBuilder_RateIntegrity(t *testing.T) {
 
 func TestTxBuilder_CurrencyConsistency(t *testing.T) {
 	config := core.LedgerConfig{FunctionalCurrency: codeUSD}
-	b := core.NewTxBuilder("tx6", time.Now(), config, mockRateProvider{})
+	b := core.NewTxBuilder("tx6", time.Now().UTC(), config, mockRateProvider{})
 
-	// This now fails at NewEntry construction because of identity rate validation EUR vs USD
-	// If we want to test the Builder's internal check, we must ensure NewEntry succeeds first.
-	e1, _ := core.NewEntry("acc1", decimal.NewFromInt(100), codeEUR, decimal.NewFromFloat(1.1), codeEUR)
+	e1, err := core.NewEntry("acc1", decimal.NewFromInt(100), codeEUR, decimal.NewFromInt(1), codeEUR)
+	if err != nil {
+		t.Fatalf("NewEntry: %v", err)
+	}
 	b.AddEntry(e1)
 
-	if _, err := b.Build(); !errors.Is(err, pkgerr.ErrCurrencyMismatch) {
-		t.Errorf("Expected ErrCurrencyMismatch, got %v", err)
-	}
+	_, err = b.Build()
+	assertBuildValidationError(t, err, pkgerr.ErrCurrencyMismatch, "functionalCurrency", 0)
 }

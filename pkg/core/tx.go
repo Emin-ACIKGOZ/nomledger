@@ -4,6 +4,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	pkgerr "github.com/Emin-ACIKGOZ/nomledger/pkg/errors" // Alias package errors to avoid collision
@@ -136,14 +137,16 @@ func (b *TxBuilder) WithMetadata(meta map[string]any) *TxBuilder {
 
 // Build validates the accumulated state and returns an immutable Transaction.
 //
-// It validates the transaction ID, effective date, entry count, metadata keys,
-// configuration, currency consistency, zero-sum balance, period closure, and
-// rate integrity. The returned error is a *ValidationError for field-level
-// failures.
+// Validation follows a fixed order: configuration, transaction ID, effective
+// date, non-empty entries, metadata keys, entry validity, currency consistency,
+// zero-sum balance, period closure, and rate integrity. It fails fast, calls no
+// later checks or providers after a failure, and returns the zero Transaction
+// on every error. Field-level failures are *ValidationError values; provider
+// errors are wrapped with ErrRateProvider while preserving their cause.
 func (b *TxBuilder) Build() (Transaction, error) {
 	// 0. Validate Configuration Integrity
 	if err := b.config.Validate(); err != nil {
-		return Transaction{}, err
+		return Transaction{}, rewrapValidationError(err, buildOperation, "config")
 	}
 
 	// 1. Validate Transaction Fields
@@ -152,22 +155,27 @@ func (b *TxBuilder) Build() (Transaction, error) {
 		return Transaction{}, err
 	}
 
-	// 2. Validate Consistency (Ledger Currency vs Entry Currency)
+	// 2. Validate Entries
+	if err := b.validateEntries(); err != nil {
+		return Transaction{}, err
+	}
+
+	// 3. Validate Consistency (Ledger Currency vs Entry Currency)
 	if err := b.validateCurrencyConsistency(); err != nil {
 		return Transaction{}, err
 	}
 
-	// 3. Validate Zero-Sum
+	// 4. Validate Zero-Sum
 	if err := b.validateZeroSum(); err != nil {
 		return Transaction{}, err
 	}
 
-	// 4. Validate Period Closure
+	// 5. Validate Period Closure
 	if err := b.validatePeriod(effectiveDate); err != nil {
 		return Transaction{}, err
 	}
 
-	// 5. Validate Rates
+	// 6. Validate Rates
 	if err := validateRates(
 		context.Background(),
 		b.entries,
@@ -251,10 +259,39 @@ func validMetadataKey(key string) bool {
 	return true
 }
 
+func (b *TxBuilder) validateEntries() error {
+	for i, entry := range b.entries {
+		if err := entry.Validate(); err != nil {
+			return rewrapEntryValidationError(err, i)
+		}
+	}
+	return nil
+}
+
+func rewrapEntryValidationError(err error, entryIndex int) error {
+	var validationErr *pkgerr.ValidationError
+	if errors.As(err, &validationErr) {
+		return pkgerr.NewEntryValidationError(
+			validationErr.Code,
+			buildOperation,
+			entryIndex,
+			validationErr.Field,
+			validationErr.Cause,
+		)
+	}
+	return pkgerr.NewEntryValidationError(err, buildOperation, entryIndex, "entry", nil)
+}
+
 func (b *TxBuilder) validateCurrencyConsistency() error {
-	for _, e := range b.entries {
-		if e.FunctionalCurrency() != b.config.FunctionalCurrency {
-			return pkgerr.ErrCurrencyMismatch
+	for i, entry := range b.entries {
+		if entry.FunctionalCurrency() != b.config.FunctionalCurrency {
+			return pkgerr.NewEntryValidationError(
+				pkgerr.ErrCurrencyMismatch,
+				buildOperation,
+				i,
+				"functionalCurrency",
+				nil,
+			)
 		}
 	}
 	return nil
@@ -262,13 +299,18 @@ func (b *TxBuilder) validateCurrencyConsistency() error {
 
 func (b *TxBuilder) validateZeroSum() error {
 	sum := decimal.Zero
-	for _, e := range b.entries {
-		sum = sum.Add(e.FunctionalAmount())
+	for _, entry := range b.entries {
+		sum = sum.Add(entry.FunctionalAmount())
 	}
 
 	// Invariant 1: Sum == 0
 	if !sum.IsZero() {
-		return pkgerr.ErrZeroSumViolation
+		return pkgerr.NewValidationError(
+			pkgerr.ErrZeroSumViolation,
+			buildOperation,
+			"entries",
+			nil,
+		)
 	}
 	return nil
 }
@@ -281,5 +323,10 @@ func (b *TxBuilder) validatePeriod(effectiveDate time.Time) error {
 	if b.isAdjustingEvent {
 		return nil
 	}
-	return pkgerr.ErrPeriodClosed
+	return pkgerr.NewValidationError(
+		pkgerr.ErrPeriodClosed,
+		buildOperation,
+		"effectiveDate",
+		nil,
+	)
 }
