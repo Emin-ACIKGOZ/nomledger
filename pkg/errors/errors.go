@@ -96,4 +96,8 @@ var (
 	// ErrInexactRounding indicates an unnecessary-rounding request would change
 	// the numeric value.
 	ErrInexactRounding = errors.New("rounding would change the value")
+
+	// ErrBuilderFinalized indicates Build was called again after a successful
+	// build finalized the builder.
+	ErrBuilderFinalized = errors.New("builder is already finalized")
 )

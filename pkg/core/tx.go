@@ -85,8 +85,10 @@ type TransactionInput struct {
 
 // TxBuilder accumulates state for constructing a Transaction.
 //
-// It is stateful and not safe for concurrent use. A new builder must be
-// instantiated for each transaction attempt. TxBuilder.Build runs the same
+// A builder starts accumulating, a failed Build leaves it retryable, and a
+// successful Build finalizes it. After finalisation, AddEntry, SetAdjustingEvent,
+// and WithMetadata are no-ops, and Build returns ErrBuilderFinalized. It is
+// stateful and not safe for concurrent use. TxBuilder.Build runs the same
 // validation pipeline as Ledger.ValidateTransaction.
 type TxBuilder struct {
 	id               string
@@ -95,6 +97,7 @@ type TxBuilder struct {
 	entries          []Entry
 	metadata         map[string]any
 	operation        string
+	finalized        bool
 
 	rateProvider interfaces.RateProvider
 	config       LedgerConfig
@@ -119,7 +122,12 @@ func NewTxBuilder(
 }
 
 // AddEntry appends a line item to the transaction.
+//
+// It is a no-op after a successful Build.
 func (b *TxBuilder) AddEntry(e Entry) *TxBuilder {
+	if b.finalized {
+		return b
+	}
 	b.entries = append(b.entries, e)
 	return b
 }
@@ -127,8 +135,12 @@ func (b *TxBuilder) AddEntry(e Entry) *TxBuilder {
 // SetAdjustingEvent marks the transaction as an IAS 10 Adjusting Event.
 //
 // The flag is a caller-supplied classification and only bypasses the period
-// closure check; it does not affect any other validation rule.
+// closure check; it does not affect any other validation rule. It is a no-op
+// after a successful Build.
 func (b *TxBuilder) SetAdjustingEvent(isAdjusting bool) *TxBuilder {
+	if b.finalized {
+		return b
+	}
 	b.isAdjustingEvent = isAdjusting
 	return b
 }
@@ -139,9 +151,10 @@ func (b *TxBuilder) SetAdjustingEvent(isAdjusting bool) *TxBuilder {
 // the caller's top-level map after this call does not affect the builder.
 // Metadata values that are reference types remain caller-owned. Keys
 // are validated when Build runs: they must be non-empty, at most 64 bytes, and
-// free of NUL and ASCII control characters.
+// free of NUL and ASCII control characters. It is a no-op after a successful
+// Build.
 func (b *TxBuilder) WithMetadata(meta map[string]any) *TxBuilder {
-	if meta == nil {
+	if b.finalized || meta == nil {
 		return b
 	}
 	if b.metadata == nil {
@@ -163,7 +176,22 @@ func (b *TxBuilder) WithMetadata(meta map[string]any) *TxBuilder {
 // and returns the zero Transaction on every error. Field-level failures are
 // *ValidationError values; provider errors are wrapped with ErrRateProvider
 // while preserving their cause.
+//
+// A failed Build leaves the builder retryable. A successful Build finalizes the
+// builder; a subsequent Build returns ErrBuilderFinalized.
 func (b *TxBuilder) Build() (Transaction, error) {
+	operation := b.operation
+	if operation == "" {
+		operation = buildOperation
+	}
+	if b.finalized {
+		return Transaction{}, pkgerr.NewValidationError(
+			pkgerr.ErrBuilderFinalized,
+			operation,
+			"builder",
+			nil,
+		)
+	}
 	return b.build(context.Background())
 }
 
@@ -171,6 +199,7 @@ func (b *TxBuilder) build(ctx context.Context) (Transaction, error) {
 	if b.operation == "" {
 		b.operation = buildOperation
 	}
+
 	ctx, err := validationContext(ctx, b.operation)
 	if err != nil {
 		return Transaction{}, err
@@ -219,14 +248,16 @@ func (b *TxBuilder) build(ctx context.Context) (Transaction, error) {
 		return Transaction{}, err
 	}
 
-	return Transaction{
+	transaction := Transaction{
 		id:               b.id,
 		effectiveDate:    effectiveDate,
 		isAdjustingEvent: b.isAdjustingEvent,
 		postedAt:         time.Now().UTC(),
 		entries:          append([]Entry(nil), b.entries...),
 		metadata:         copyMetadata(b.metadata),
-	}, nil
+	}
+	b.finalized = true
+	return transaction, nil
 }
 
 func validationContext(ctx context.Context, operation string) (context.Context, error) {

@@ -33,6 +33,7 @@
 //
 // The primary entry point is the Ledger struct, which is safe for concurrent
 // use. Lower-level primitives like TxBuilder are provided for granular control
-// but require manual lifecycle management. Metadata values are shallowly copied
-// and remain caller-owned.
+// but require manual lifecycle management: a successful Build finalizes the
+// builder, while a failed Build leaves it retryable. Metadata values are
+// shallowly copied and remain caller-owned.
 package core

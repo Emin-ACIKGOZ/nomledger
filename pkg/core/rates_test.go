@@ -205,28 +205,43 @@ func TestProviderDeduplication(t *testing.T) {
 		}
 	})
 
-	t.Run("cache is per validation", func(t *testing.T) {
-		provider := &recordingRateProvider{rates: map[string]decimal.Decimal{
-			pairEURUSD: mustTxDecimal(t, ledgerRate),
-		}}
-		builder := core.NewTxBuilder(txID, effective, txTestConfig(), provider)
-		builder.AddEntry(mustRateEntry(t, "eur-1", txAmountHundred, codeEUR, ledgerRate, codeUSD))
-		builder.AddEntry(mustRateEntry(t, "eur-2", rateAmountFifty, codeEUR, ledgerRate, codeUSD))
-		builder.AddEntry(mustRateEntry(t, "usd-1", rateAmountNeg165, codeUSD, txRateOne, codeUSD))
+	t.Run("cache is per validation", testProviderCachePerValidation)
+}
 
-		if _, err := builder.Build(); err != nil {
-			t.Fatalf("first Build: %v", err)
-		}
-		if provider.calls() != 1 {
-			t.Fatalf("calls after first Build = %d; want 1", provider.calls())
-		}
-		if _, err := builder.Build(); err != nil {
-			t.Fatalf("second Build: %v", err)
-		}
-		if provider.calls() != 2 {
-			t.Errorf("calls after second Build = %d; want 2", provider.calls())
-		}
-	})
+func testProviderCachePerValidation(t *testing.T) {
+	t.Helper()
+	effective := ledgerEffectiveDate()
+
+	provider := &recordingRateProvider{rates: map[string]decimal.Decimal{
+		pairEURUSD: mustTxDecimal(t, ledgerRate),
+	}}
+	entries := []core.Entry{
+		mustRateEntry(t, "eur-1", txAmountHundred, codeEUR, ledgerRate, codeUSD),
+		mustRateEntry(t, "eur-2", rateAmountFifty, codeEUR, ledgerRate, codeUSD),
+		mustRateEntry(t, "usd-1", rateAmountNeg165, codeUSD, txRateOne, codeUSD),
+	}
+
+	firstBuilder := core.NewTxBuilder(txID, effective, txTestConfig(), provider)
+	for _, entry := range entries {
+		firstBuilder.AddEntry(entry)
+	}
+	if _, err := firstBuilder.Build(); err != nil {
+		t.Fatalf("first Build: %v", err)
+	}
+	if provider.calls() != 1 {
+		t.Fatalf("calls after first Build = %d; want 1", provider.calls())
+	}
+
+	secondBuilder := core.NewTxBuilder(txID, effective, txTestConfig(), provider)
+	for _, entry := range entries {
+		secondBuilder.AddEntry(entry)
+	}
+	if _, err := secondBuilder.Build(); err != nil {
+		t.Fatalf("second Build: %v", err)
+	}
+	if provider.calls() != 2 {
+		t.Errorf("calls after second Build = %d; want 2", provider.calls())
+	}
 }
 
 // TestProviderErrorWrap.

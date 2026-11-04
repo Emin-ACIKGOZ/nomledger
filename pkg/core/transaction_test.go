@@ -109,7 +109,7 @@ func assertEntriesEqual(t *testing.T, got, want []core.Entry) {
 
 // TestTransactionEntriesIndependent.
 func TestTransactionEntriesIndependent(t *testing.T) {
-	transaction, builder := newValidTransaction(t, txID, nil)
+	transaction, _ := newValidTransaction(t, txID, nil)
 	before := transaction.Entries()
 
 	returned := transaction.Entries()
@@ -122,10 +122,6 @@ func TestTransactionEntriesIndependent(t *testing.T) {
 
 	afterMutation := transaction.Entries()
 	assertEntriesEqual(t, afterMutation, before)
-
-	builder.AddEntry(extra)
-	afterBuilderMutation := transaction.Entries()
-	assertEntriesEqual(t, afterBuilderMutation, before)
 }
 
 // TestTransactionMetadataIndependent.
@@ -134,11 +130,36 @@ func TestTransactionMetadataIndependent(t *testing.T) {
 		txMetaNote:  txMetaValue,
 		txMetaCount: 1,
 	}
-	transaction, builder := newValidTransaction(t, txID, input)
+	builder := core.NewTxBuilder(txID, ledgerEffectiveDate(), txTestConfig(), mockRateProvider{})
+	for _, entry := range transactionFieldEntries(t) {
+		builder.AddEntry(entry)
+	}
+	builder.WithMetadata(input)
+
+	input[txMetaNote] = "mutated input"
+	input["later"] = true
+
+	transaction, err := builder.Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	if transaction.Metadata()[txMetaNote] != txMetaValue {
+		t.Errorf("Metadata()[note] = %v; want %v", transaction.Metadata()[txMetaNote], txMetaValue)
+	}
+	if _, ok := transaction.Metadata()["later"]; ok {
+		t.Error("caller input mutation leaked into the builder")
+	}
 
 	assertReturnedMetadataIndependent(t, transaction)
-	assertCallerMetadataIndependent(t, transaction, builder, input)
-	assertBuilderMetadataAfterBuildIndependent(t, transaction, builder)
+
+	input[txMetaNote] = "mutated after build"
+	builder.WithMetadata(map[string]any{txMetaBuilder: txMetaChanged})
+	if _, ok := transaction.Metadata()[txMetaBuilder]; ok {
+		t.Error("WithMetadata after Build leaked into the transaction")
+	}
+	if transaction.Metadata()[txMetaNote] != txMetaValue {
+		t.Errorf("transaction Metadata()[note] = %v; want %v", transaction.Metadata()[txMetaNote], txMetaValue)
+	}
 }
 
 func assertReturnedMetadataIndependent(t *testing.T, transaction core.Transaction) {
@@ -157,52 +178,6 @@ func assertReturnedMetadataIndependent(t *testing.T, transaction core.Transactio
 	}
 	if _, ok := again["added"]; ok {
 		t.Error("Metadata() gained key \"added\" after returned-map mutation")
-	}
-}
-
-func assertCallerMetadataIndependent(
-	t *testing.T,
-	transaction core.Transaction,
-	builder *core.TxBuilder,
-	input map[string]any,
-) {
-	t.Helper()
-	input[txMetaNote] = "mutated input"
-	input["later"] = true
-
-	second, err := builder.Build()
-	if err != nil {
-		t.Fatalf("second Build: %v", err)
-	}
-	if second.Metadata()[txMetaNote] != txMetaValue {
-		t.Errorf("builder Metadata()[note] = %v; want %v", second.Metadata()[txMetaNote], txMetaValue)
-	}
-	if _, ok := second.Metadata()["later"]; ok {
-		t.Error("caller input mutation leaked into the builder")
-	}
-	if transaction.Metadata()[txMetaNote] != txMetaValue {
-		t.Errorf("transaction Metadata()[note] = %v; want %v", transaction.Metadata()[txMetaNote], txMetaValue)
-	}
-}
-
-func assertBuilderMetadataAfterBuildIndependent(
-	t *testing.T,
-	transaction core.Transaction,
-	builder *core.TxBuilder,
-) {
-	t.Helper()
-	builder.WithMetadata(map[string]any{txMetaBuilder: txMetaChanged})
-	if _, ok := transaction.Metadata()[txMetaBuilder]; ok {
-		t.Error("WithMetadata after Build leaked into the transaction")
-	}
-
-	third, err := builder.Build()
-	if err != nil {
-		t.Fatalf("third Build: %v", err)
-	}
-	if third.Metadata()[txMetaBuilder] != txMetaChanged {
-		t.Errorf("builder reuse Metadata()[builder] = %v; want %v",
-			third.Metadata()[txMetaBuilder], txMetaChanged)
 	}
 }
 
