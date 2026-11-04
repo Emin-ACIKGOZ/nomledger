@@ -5,14 +5,16 @@ package core
 import (
 	"time"
 
+	pkgerr "github.com/Emin-ACIKGOZ/nomledger/pkg/errors"
 	"github.com/Emin-ACIKGOZ/nomledger/pkg/interfaces"
 )
 
 // Ledger is the concurrency-safe entry point for the validation engine.
 //
-// It encapsulates the configuration and dependencies required to ensure consistent
-// validation rules across all transactions. It serves as a factory for internal
-// builders, preventing state leakage between requests.
+// It encapsulates the validated configuration and rate provider required to
+// enforce consistent validation rules across all transactions. Fields are
+// unexported and immutable after construction; each validation uses a fresh
+// internal builder.
 type Ledger struct {
 	config       LedgerConfig
 	rateProvider interfaces.RateProvider
@@ -20,13 +22,21 @@ type Ledger struct {
 
 // NewLedger constructs a new Ledger instance.
 //
-// The provided configuration and rate provider are captured and used for all
-// subsequent validations performed by this instance.
-func NewLedger(config LedgerConfig, rp interfaces.RateProvider) *Ledger {
-	return &Ledger{
-		config:       config,
-		rateProvider: rp,
+// It validates and normalises the configuration before accepting it, and rejects
+// a nil rate provider with ErrNilRateProvider. Errors are *ValidationError
+// values with Operation "NewLedger" and Field "config" or "provider".
+func NewLedger(config LedgerConfig, provider interfaces.RateProvider) (*Ledger, error) {
+	if err := config.Validate(); err != nil {
+		return nil, rewrapValidationError(err, "NewLedger", "config")
 	}
+	if provider == nil {
+		return nil, pkgerr.NewValidationError(pkgerr.ErrNilRateProvider, "NewLedger", "provider", nil)
+	}
+
+	return &Ledger{
+		config:       normalizeConfig(config),
+		rateProvider: provider,
+	}, nil
 }
 
 // ValidateTransaction constructs and validates a transaction in a single atomic operation.
@@ -51,13 +61,23 @@ func (l *Ledger) ValidateTransaction(
 	return b.Build()
 }
 
-// UpdateConfig returns a new Ledger instance with updated configuration.
+// Config returns a copy of the ledger's normalised configuration.
+func (l *Ledger) Config() LedgerConfig {
+	return l.config
+}
+
+// UpdateConfig returns a new validated Ledger with updated configuration.
 //
-// It does not mutate the existing Ledger instance, ensuring that ongoing validations
-// are not affected by configuration changes.
-func (l *Ledger) UpdateConfig(newConfig LedgerConfig) *Ledger {
-	return &Ledger{
-		config:       newConfig,
-		rateProvider: l.rateProvider,
+// It preserves the existing rate provider and never mutates the receiver.
+// Errors are *ValidationError values with Operation "UpdateConfig" and Field
+// "config".
+func (l *Ledger) UpdateConfig(config LedgerConfig) (*Ledger, error) {
+	if err := config.Validate(); err != nil {
+		return nil, rewrapValidationError(err, "UpdateConfig", "config")
 	}
+
+	return &Ledger{
+		config:       normalizeConfig(config),
+		rateProvider: l.rateProvider,
+	}, nil
 }

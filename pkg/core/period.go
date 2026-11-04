@@ -5,6 +5,7 @@ package core
 import (
 	"time"
 
+	"github.com/Emin-ACIKGOZ/nomledger/pkg/currency"
 	pkgerr "github.com/Emin-ACIKGOZ/nomledger/pkg/errors"
 
 	"github.com/shopspring/decimal"
@@ -31,14 +32,47 @@ type LedgerConfig struct {
 }
 
 // Validate ensures the configuration is well-formed.
-// It returns ErrInvalidConfiguration if the RateTolerance is negative or
-// if FunctionalCurrency is missing.
+//
+// FunctionalCurrency must be a valid, ratable, active ISO 4217 currency and
+// RateTolerance must be zero or positive. ClosedDate may be zero. The returned
+// error is a *ValidationError wrapping ErrInvalidConfiguration.
 func (c LedgerConfig) Validate() error {
-	if c.RateTolerance.IsNegative() {
-		return pkgerr.ErrInvalidConfiguration
+	currencyInfo, err := currency.Lookup(c.FunctionalCurrency)
+	if err != nil {
+		return pkgerr.NewValidationError(
+			pkgerr.ErrInvalidConfiguration,
+			"LedgerConfig.Validate",
+			"functionalCurrency",
+			err,
+		)
 	}
-	if c.FunctionalCurrency == "" {
-		return pkgerr.ErrInvalidConfiguration
+	if _, ratable := currencyInfo.MinorUnits(); !ratable {
+		return pkgerr.NewValidationError(
+			pkgerr.ErrInvalidConfiguration,
+			"LedgerConfig.Validate",
+			"functionalCurrency",
+			pkgerr.ErrCurrencyNotRatable,
+		)
+	}
+	if c.RateTolerance.IsNegative() {
+		return pkgerr.NewValidationError(
+			pkgerr.ErrInvalidConfiguration,
+			"LedgerConfig.Validate",
+			"rateTolerance",
+			nil,
+		)
 	}
 	return nil
+}
+
+// normalizeConfig canonicalises fields that have a unique representation while
+// leaving invalid values untouched for Validate to reject.
+func normalizeConfig(config LedgerConfig) LedgerConfig {
+	if currencyInfo, err := currency.Lookup(config.FunctionalCurrency); err == nil {
+		config.FunctionalCurrency = string(currencyInfo.Code())
+	}
+	if !config.ClosedDate.IsZero() {
+		config.ClosedDate = config.ClosedDate.UTC()
+	}
+	return config
 }

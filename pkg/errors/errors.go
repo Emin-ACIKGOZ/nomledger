@@ -39,6 +39,10 @@ var (
 	// ErrInvalidEntry indicates a zero-value or internally inconsistent entry.
 	ErrInvalidEntry = errors.New("invalid entry")
 
+	// ErrNilRateProvider indicates a nil rate provider was supplied or a rate
+	// lookup was attempted without one.
+	ErrNilRateProvider = errors.New("rate provider must not be nil")
+
 	// ErrInvalidAccountID indicates the account ID is empty, too long, or
 	// contains a control character.
 	ErrInvalidAccountID = errors.New("invalid account ID")

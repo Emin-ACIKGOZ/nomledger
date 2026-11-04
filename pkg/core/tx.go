@@ -82,7 +82,7 @@ func NewTxBuilder(
 	return &TxBuilder{
 		id:            id,
 		effectiveDate: date,
-		config:        config,
+		config:        normalizeConfig(config),
 		rateProvider:  rp,
 		entries:       make([]Entry, 0),
 		metadata:      make(map[string]any),
@@ -210,6 +210,10 @@ func (b *TxBuilder) validateRates() error {
 		// Exchange rates must be strictly positive. Zero is mathematically invalid for conversion.
 		if e.ExchangeRate().LessThanOrEqual(decimal.Zero) {
 			return pkgerr.ErrInvalidExchangeRate
+		}
+
+		if b.rateProvider == nil {
+			return pkgerr.ErrNilRateProvider
 		}
 
 		// Invariant 2b: Rate Check against Provider

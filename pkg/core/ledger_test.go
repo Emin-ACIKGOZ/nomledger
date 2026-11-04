@@ -16,12 +16,15 @@ func TestLedger_ConcurrencySafety(t *testing.T) {
 	// Setup
 	config := core.LedgerConfig{
 		ClosedDate:         time.Date(2023, 12, 31, 23, 59, 59, 0, time.UTC),
-		FunctionalCurrency: "USD",
+		FunctionalCurrency: codeUSD,
 	}
-	rp := mockRateProvider{rates: map[string]decimal.Decimal{"EUR/USD": decimal.NewFromFloat(1.1)}}
+	rp := mockRateProvider{rates: map[string]decimal.Decimal{pairEURUSD: decimal.NewFromFloat(1.1)}}
 
 	// Create the facade
-	ledger := core.NewLedger(config, rp)
+	ledger, err := core.NewLedger(config, rp)
+	if err != nil {
+		t.Fatalf("NewLedger: %v", err)
+	}
 
 	// Simulate high-concurrency usage
 	// 100 goroutines attempting to validate transactions simultaneously
@@ -35,8 +38,8 @@ func TestLedger_ConcurrencySafety(t *testing.T) {
 
 			// Each goroutine calls ValidateTransaction
 			// The Ledger struct ensures a new Builder is created internally for each call
-			e1, err1 := core.NewEntry("acc1", decimal.NewFromInt(100), "USD", decimal.NewFromInt(1), "USD")
-			e2, err2 := core.NewEntry("acc2", decimal.NewFromInt(-100), "USD", decimal.NewFromInt(1), "USD")
+			e1, err1 := core.NewEntry("acc1", decimal.NewFromInt(100), codeUSD, decimal.NewFromInt(1), codeUSD)
+			e2, err2 := core.NewEntry("acc2", decimal.NewFromInt(-100), codeUSD, decimal.NewFromInt(1), codeUSD)
 			if err1 != nil || err2 != nil {
 				t.Errorf("Entry construction failed")
 				return
