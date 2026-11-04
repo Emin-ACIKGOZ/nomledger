@@ -1,8 +1,14 @@
 // SPDX-License-Identifier: MIT
 
-// Package currency provides ISO 4217 precision arithmetic and rounding rules.
+// Package currency provides the ISO 4217 currency registry, code validation,
+// precision arithmetic, and rounding rules.
 //
-// It serves as the canonical source of truth for decimal formatting in financial
-// calculations, ensuring that all amounts are rounded according to the official
-// exponent for their respective currency codes.
+// The registry is compiled in from SIX List One (published 2026-09-17) through
+// the generated internal/iso4217 table. Lookup accepts three ASCII letters in
+// any case and returns the canonical uppercase currency. Currencies whose minor
+// units are published as N.A. remain discoverable but are not ratable; monetary
+// operations reject them with ErrCurrencyNotRatable.
+//
+// GetPrecision and RoundToPrecision are deprecated compatibility wrappers around
+// the registry.
 package currency

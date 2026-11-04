@@ -37,6 +37,15 @@ var (
 	// ErrInvalidConfiguration indicates the LedgerConfig is malformed (e.g. negative tolerance).
 	ErrInvalidConfiguration = errors.New("invalid ledger configuration")
 
-	// ErrUnknownCurrency indicates the currency code is not supported by the precision table.
+	// ErrUnknownCurrency indicates the currency code is well-formed but not
+	// present in the active ISO 4217 registry.
 	ErrUnknownCurrency = errors.New("unknown or unsupported currency code")
+
+	// ErrInvalidCurrencyCode indicates the currency code is not exactly three
+	// ASCII letters.
+	ErrInvalidCurrencyCode = errors.New("currency code must be exactly three ASCII letters")
+
+	// ErrCurrencyNotRatable indicates the currency has no defined minor units
+	// and therefore cannot be used for monetary amounts.
+	ErrCurrencyNotRatable = errors.New("currency has no defined minor units")
 )

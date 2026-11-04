@@ -46,6 +46,7 @@ func NewEntry(
 	}
 
 	rawAmount := txAmount.Mul(exchangeRate)
+	//nolint:staticcheck // Deprecated wrapper retained for the pre-1.0 call shape.
 	canonicalAmount, err := currency.RoundToPrecision(rawAmount, functionalCurrency)
 	if err != nil {
 		return Entry{}, err
