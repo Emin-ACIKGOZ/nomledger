@@ -117,10 +117,10 @@ func TestNewEntry_CanonicalMath(t *testing.T) {
 		funcCurrency string
 		want         string
 	}{
-		{"USD to EUR", "100.00", entryRateEightyFive, codeUSD, codeEUR, "85.00"},
+		{"USD to EUR", txAmountHundred, entryRateEightyFive, codeUSD, codeEUR, "85.00"},
 		{"USD to JPY", entryAmountTen, "10.55", codeUSD, codeJPY, "106"},
-		{"USD to CLF high precision", "1000", "0.00001667", codeUSD, "CLF", "0.0167"},
-		{"negative USD to EUR", "-100.00", entryRateEightyFive, codeUSD, codeEUR, "-85.00"},
+		{"USD to CLF high precision", "1000", "0.00001667", codeUSD, codeCLF, "0.0167"},
+		{"negative USD to EUR", txAmountNegHundred, entryRateEightyFive, codeUSD, codeEUR, "-85.00"},
 		{"negative USD to JPY", "-10.00", "10.55", codeUSD, codeJPY, "-106"},
 		{"HalfEven tie down", "1.01", entryRateHalf, codeEUR, codeUSD, "0.50"},
 		{"HalfEven tie up", "1.03", entryRateHalf, codeEUR, codeUSD, "0.52"},
@@ -176,7 +176,7 @@ func TestNewEntry_AccountIDValidation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			entry, err := core.NewEntry(
 				tc.id,
-				mustEntryDecimal(t, "1.00"),
+				mustEntryDecimal(t, txAmountOne),
 				codeUSD,
 				mustEntryDecimal(t, "1"),
 				codeUSD,
@@ -227,7 +227,7 @@ func TestNewEntry_CurrencyValidation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			entry, err := core.NewEntry(
 				validID,
-				mustEntryDecimal(t, "1.00"),
+				mustEntryDecimal(t, txAmountOne),
 				tc.txCurrency,
 				mustEntryDecimal(t, tc.rate),
 				tc.funcCurrency,
@@ -261,13 +261,13 @@ func TestNewEntry_Precision(t *testing.T) {
 		funcCurrency string
 		wantErr      error
 	}{
-		{"USD 1.001 rejected", "1.001", codeUSD, codeEUR, pkgerr.ErrInvalidPrecision},
-		{"USD 1.00 accepted", "1.00", codeUSD, codeEUR, nil},
+		{"USD 1.001 rejected", txAmountOverPrecision, codeUSD, codeEUR, pkgerr.ErrInvalidPrecision},
+		{"USD 1.00 accepted", txAmountOne, codeUSD, codeEUR, nil},
 		{"JPY 1.5 rejected", "1.5", codeJPY, codeUSD, pkgerr.ErrInvalidPrecision},
 		{"BHD 1.234 accepted", "1.234", codeBHD, codeUSD, nil},
 		{"BHD 1.2345 rejected", "1.2345", codeBHD, codeUSD, pkgerr.ErrInvalidPrecision},
 		{"USD 10.123456 rejected", "10.123456", codeUSD, codeUSD, pkgerr.ErrInvalidPrecision},
-		{"negative USD 1.001 rejected", "-1.001", codeUSD, codeEUR, pkgerr.ErrInvalidPrecision},
+		{"negative USD 1.001 rejected", txAmountNegOverPrecision, codeUSD, codeEUR, pkgerr.ErrInvalidPrecision},
 		{"JPY 100 accepted", "100", codeJPY, codeUSD, nil},
 	}
 
@@ -333,7 +333,7 @@ func TestNewEntry_ExchangeRatePositivity(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			entry, err := core.NewEntry(
 				validID,
-				mustEntryDecimal(t, "100.00"),
+				mustEntryDecimal(t, txAmountHundred),
 				tc.txCurrency,
 				mustEntryDecimal(t, tc.rate),
 				tc.funcCurrency,
@@ -374,7 +374,7 @@ func TestNewEntry_WhenCurrenciesMatch_EnforcesIdentityRate(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			entry, err := core.NewEntry(
 				validID,
-				mustEntryDecimal(t, "100.00"),
+				mustEntryDecimal(t, txAmountHundred),
 				tc.txCurrency,
 				mustEntryDecimal(t, tc.rate),
 				tc.funcCurrency,
@@ -421,7 +421,7 @@ func TestNewEntry_Rounding_PreventsFunctionalZeroEntries(t *testing.T) {
 // TestNewEntry_HighPrecision_PreservesDecimalIntegrity keeps the CLF case with
 // exact decimal fixtures.
 func TestNewEntry_HighPrecision_PreservesDecimalIntegrity(t *testing.T) {
-	entry := mustValidEntry(t, validID, "1000", codeUSD, "0.00001667", "CLF")
+	entry := mustValidEntry(t, validID, "1000", codeUSD, "0.00001667", codeCLF)
 	want := mustEntryDecimal(t, "0.0167")
 	if !entry.FunctionalAmount().Equal(want) {
 		t.Errorf("FunctionalAmount() = %s; want %s", entry.FunctionalAmount(), want)
@@ -560,10 +560,10 @@ func TestNewEntry_FunctionalAmountNonZero(t *testing.T) {
 		funcCurrency string
 		wantNegative bool
 	}{
-		{"positive USD", "1.00", "1", codeUSD, codeUSD, false},
-		{"negative USD", "-1.00", "1", codeUSD, codeUSD, true},
-		{"positive foreign", "100.00", entryRateEightyFive, codeUSD, codeEUR, false},
-		{"negative foreign", "-100.00", entryRateEightyFive, codeUSD, codeEUR, true},
+		{"positive USD", txAmountOne, "1", codeUSD, codeUSD, false},
+		{"negative USD", txAmountNegOne, "1", codeUSD, codeUSD, true},
+		{"positive foreign", txAmountHundred, entryRateEightyFive, codeUSD, codeEUR, false},
+		{"negative foreign", txAmountNegHundred, entryRateEightyFive, codeUSD, codeEUR, true},
 		{"small positive", "0.01", "1", codeUSD, codeUSD, false},
 		{"small negative", "-0.01", "1", codeUSD, codeUSD, true},
 	}

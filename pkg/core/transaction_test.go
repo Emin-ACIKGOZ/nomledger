@@ -18,10 +18,14 @@ const (
 	txCreditAccount = "acc-credit"
 	txExtraAccount  = "acc-extra"
 
-	txAmountHundred    = "100.00"
-	txAmountNegHundred = "-100.00"
-	txAmountOne        = "1.00"
-	txRateOne          = "1"
+	txAmountHundred          = "100.00"
+	txAmountNegHundred       = "-100.00"
+	txAmountOne              = "1.00"
+	txAmountNegOne           = "-1.00"
+	txAmountOverPrecision    = "1.001"
+	txAmountNegOverPrecision = "-1.001"
+	codeCLF                  = "CLF"
+	txRateOne                = "1"
 
 	txMetaNote    = "note"
 	txMetaCount   = "n"
@@ -110,7 +114,7 @@ func assertEntriesEqual(t *testing.T, got, want []core.Entry) {
 // TestTransactionEntriesIndependent.
 func TestTransactionEntriesIndependent(t *testing.T) {
 	transaction, _ := newValidTransaction(t, txID, nil)
-	before := transaction.Entries()
+	before := append([]core.Entry(nil), transaction.Entries()...)
 
 	returned := transaction.Entries()
 	returned[0] = core.Entry{}

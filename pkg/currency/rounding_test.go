@@ -140,7 +140,7 @@ func TestRoundModes(t *testing.T) {
 		{"JPY Ceiling -100.9", "-100.9", codeJPY, currency.RoundCeiling, "-100", nil},
 		{"JPY Unnecessary exact", "100", codeJPY, currency.RoundUnnecessary, "100", nil},
 		{"JPY Unnecessary decimal zero", "100.0", codeJPY, currency.RoundUnnecessary, "100", nil},
-		{"JPY Unnecessary inexact", "1.5", codeJPY, currency.RoundUnnecessary, "", pkgerr.ErrInexactRounding},
+		{"JPY Unnecessary inexact", jpyInexactAmount, codeJPY, currency.RoundUnnecessary, "", pkgerr.ErrInexactRounding},
 
 		// BHD (three minor units).
 		{"BHD HalfEven 1.0005", bhdTie, codeBHD, currency.RoundHalfEven, bhdOne, nil},
@@ -165,7 +165,7 @@ func TestRoundModes(t *testing.T) {
 		{"BHD Unnecessary exact", bhdOneTwoThreeFour, codeBHD, currency.RoundUnnecessary, bhdOneTwoThreeFour, nil},
 		{"BHD Unnecessary trailing zero", amtScaleThree, codeBHD, currency.RoundUnnecessary, amtScaleThree, nil},
 		{"BHD Unnecessary excess zero", "1.2340", codeBHD, currency.RoundUnnecessary, bhdOneTwoThreeFour, nil},
-		{"BHD Unnecessary inexact", "1.2345", codeBHD, currency.RoundUnnecessary, "", pkgerr.ErrInexactRounding},
+		{"BHD Unnecessary inexact", bhdInexactAmount, codeBHD, currency.RoundUnnecessary, "", pkgerr.ErrInexactRounding},
 
 		// Lookup normalisation applies to Round codes too.
 		{"USD HalfEven lowercase code", amtTieEven, codeUSDLower, currency.RoundHalfEven, usdOne, nil},
