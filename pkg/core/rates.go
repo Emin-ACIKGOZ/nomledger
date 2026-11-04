@@ -33,6 +33,7 @@ func validateRates(
 	tolerance decimal.Decimal,
 	provider interfaces.RateProvider,
 	asOf time.Time,
+	operation string,
 ) error {
 	if ctx == nil {
 		ctx = context.Background()
@@ -44,7 +45,7 @@ func validateRates(
 		if entry.TxCurrency() == entry.FunctionalCurrency() {
 			continue
 		}
-		if err := validateEntryRate(ctx, entry, i, tolerance, provider, asOf, cache); err != nil {
+		if err := validateEntryRate(ctx, entry, i, tolerance, provider, asOf, operation, cache); err != nil {
 			return err
 		}
 	}
@@ -59,16 +60,17 @@ func validateEntryRate(
 	tolerance decimal.Decimal,
 	provider interfaces.RateProvider,
 	asOf time.Time,
+	operation string,
 	cache map[rateKey]decimal.Decimal,
 ) error {
 	if entry.ExchangeRate().LessThanOrEqual(decimal.Zero) {
-		return rateError(pkgerr.ErrInvalidExchangeRate, entryIndex, "exchangeRate", nil)
+		return rateError(pkgerr.ErrInvalidExchangeRate, operation, entryIndex, "exchangeRate", nil)
 	}
 	if err := ctx.Err(); err != nil {
-		return rateError(pkgerr.ErrRateProvider, entryIndex, "context", err)
+		return rateError(pkgerr.ErrRateProvider, operation, entryIndex, "context", err)
 	}
 	if provider == nil {
-		return rateError(pkgerr.ErrNilRateProvider, entryIndex, "rate", nil)
+		return rateError(pkgerr.ErrNilRateProvider, operation, entryIndex, "rate", nil)
 	}
 
 	request := interfaces.RateRequest{
@@ -76,18 +78,18 @@ func validateEntryRate(
 		Quote: currency.Code(entry.FunctionalCurrency()),
 		AsOf:  asOf,
 	}
-	providerRate, err := resolveRate(ctx, request, entryIndex, provider, cache)
+	providerRate, err := resolveRate(ctx, request, entryIndex, operation, provider, cache)
 	if err != nil {
 		return err
 	}
 
 	if providerRate.LessThanOrEqual(decimal.Zero) {
-		return rateError(pkgerr.ErrInvalidExchangeRate, entryIndex, "rate", nil)
+		return rateError(pkgerr.ErrInvalidExchangeRate, operation, entryIndex, "rate", nil)
 	}
 
 	deviation := providerRate.Sub(entry.ExchangeRate()).Abs()
 	if deviation.GreaterThan(tolerance) {
-		return rateError(pkgerr.ErrRateDeviation, entryIndex, "rate", nil)
+		return rateError(pkgerr.ErrRateDeviation, operation, entryIndex, "rate", nil)
 	}
 	return nil
 }
@@ -99,6 +101,7 @@ func resolveRate(
 	ctx context.Context,
 	request interfaces.RateRequest,
 	entryIndex int,
+	operation string,
 	provider interfaces.RateProvider,
 	cache map[rateKey]decimal.Decimal,
 ) (decimal.Decimal, error) {
@@ -120,21 +123,22 @@ func resolveRate(
 		if ctxErr != nil {
 			return decimal.Zero, rateError(
 				pkgerr.ErrRateProvider,
+				operation,
 				entryIndex,
 				"context",
 				errors.Join(cause, ctxErr),
 			)
 		}
-		return decimal.Zero, rateError(pkgerr.ErrRateProvider, entryIndex, "rate", cause)
+		return decimal.Zero, rateError(pkgerr.ErrRateProvider, operation, entryIndex, "rate", cause)
 	}
 	if ctxErr != nil {
-		return decimal.Zero, rateError(pkgerr.ErrRateProvider, entryIndex, "context", ctxErr)
+		return decimal.Zero, rateError(pkgerr.ErrRateProvider, operation, entryIndex, "context", ctxErr)
 	}
 
 	cache[key] = providerRate
 	return providerRate, nil
 }
 
-func rateError(code error, entryIndex int, field string, cause error) *pkgerr.ValidationError {
-	return pkgerr.NewEntryValidationError(code, buildOperation, entryIndex, field, cause)
+func rateError(code error, operation string, entryIndex int, field string, cause error) *pkgerr.ValidationError {
+	return pkgerr.NewEntryValidationError(code, operation, entryIndex, field, cause)
 }

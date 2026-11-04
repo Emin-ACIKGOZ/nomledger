@@ -23,6 +23,10 @@
 // Transaction on every error, and performs no later provider calls after an
 // earlier failure.
 //
+// Ledger.ValidateTransaction(ctx, TransactionInput) is the canonical validation
+// path. It treats a nil context as context.Background() and checks cancellation
+// before any validation work. TxBuilder.Build runs the same shared pipeline.
+//
 // Failures are *ValidationError values wrapping typed sentinels from the
 // pkg/errors package, so callers can use errors.Is and errors.As. Provider
 // errors are wrapped with ErrRateProvider while preserving their original cause.

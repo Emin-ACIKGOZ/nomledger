@@ -3,6 +3,7 @@
 package core_test
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"sync"
@@ -37,6 +38,21 @@ const (
 	pairEURUSD   = "EUR/USD"
 	codeUSDMixed = "UsD"
 )
+
+func validateLedger(
+	t *testing.T,
+	ledger *core.Ledger,
+	id string,
+	effectiveDate time.Time,
+	entries ...core.Entry,
+) (core.Transaction, error) {
+	t.Helper()
+	return ledger.ValidateTransaction(context.Background(), core.TransactionInput{
+		ID:            id,
+		EffectiveDate: effectiveDate,
+		Entries:       entries,
+	})
+}
 
 func mustLedgerDecimal(t *testing.T, value string) decimal.Decimal {
 	t.Helper()
@@ -170,7 +186,7 @@ func TestLedgerConfigTolerance(t *testing.T) {
 			t.Fatalf("NewLedger: %v", err)
 		}
 		debit, credit := mustEURUSDEntries(t)
-		if _, err := ledger.ValidateTransaction("tx-tol", ledgerEffectiveDate(), false, debit, credit); !errors.Is(err, pkgerr.ErrRateDeviation) {
+		if _, err := validateLedger(t, ledger, "tx-tol", ledgerEffectiveDate(), debit, credit); !errors.Is(err, pkgerr.ErrRateDeviation) {
 			t.Errorf("zero tolerance error = %v; want %v", err, pkgerr.ErrRateDeviation)
 		}
 
@@ -183,7 +199,7 @@ func TestLedgerConfigTolerance(t *testing.T) {
 		if err != nil {
 			t.Fatalf("NewLedger exact: %v", err)
 		}
-		if _, err := exact.ValidateTransaction("tx-tol-exact", ledgerEffectiveDate(), false, debit, credit); err != nil {
+		if _, err := validateLedger(t, exact, "tx-tol-exact", ledgerEffectiveDate(), debit, credit); err != nil {
 			t.Errorf("exact provider rate error = %v; want nil", err)
 		}
 	})
@@ -202,7 +218,7 @@ func TestLedgerConfigTolerance(t *testing.T) {
 			t.Fatalf("NewLedger: %v", err)
 		}
 		debit, credit := mustEURUSDEntries(t)
-		if _, err := ledger.ValidateTransaction("tx-tol-ok", ledgerEffectiveDate(), false, debit, credit); err != nil {
+		if _, err := validateLedger(t, ledger, "tx-tol-ok", ledgerEffectiveDate(), debit, credit); err != nil {
 			t.Errorf("within-tolerance error = %v; want nil", err)
 		}
 	})
@@ -231,7 +247,7 @@ func testZeroClosedDate(t *testing.T) {
 
 	debit, credit := mustUSDPairEntries(t)
 	effective := time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
-	if _, err := ledger.ValidateTransaction("tx-1970", effective, false, debit, credit); err != nil {
+	if _, err := validateLedger(t, ledger, "tx-1970", effective, debit, credit); err != nil {
 		t.Errorf("1970 transaction with zero closed date error = %v; want nil", err)
 	}
 }
@@ -273,12 +289,12 @@ func testPeriodComparesByInstant(t *testing.T) {
 
 	zone := time.FixedZone("CEST", 2*60*60)
 	equalInstant := time.Date(2024, 6, 1, 14, 0, 0, 0, zone)
-	if _, err := ledger.ValidateTransaction("tx-closed", equalInstant, false, debit, credit); !errors.Is(err, pkgerr.ErrPeriodClosed) {
+	if _, err := validateLedger(t, ledger, "tx-closed", equalInstant, debit, credit); !errors.Is(err, pkgerr.ErrPeriodClosed) {
 		t.Errorf("equal-instant transaction error = %v; want %v", err, pkgerr.ErrPeriodClosed)
 	}
 
 	after := closed.Add(time.Nanosecond)
-	if _, err := ledger.ValidateTransaction("tx-open", after, false, debit, credit); err != nil {
+	if _, err := validateLedger(t, ledger, "tx-open", after, debit, credit); err != nil {
 		t.Errorf("post-closure transaction error = %v; want nil", err)
 	}
 }
@@ -422,7 +438,7 @@ func assertUpdatedUsesProvider(t *testing.T, updated *core.Ledger) {
 	if err != nil {
 		t.Fatalf("NewEntry EUR credit: %v", err)
 	}
-	if _, err := updated.ValidateTransaction("tx-updated", ledgerEffectiveDate(), false, debit, credit); err != nil {
+	if _, err := validateLedger(t, updated, "tx-updated", ledgerEffectiveDate(), debit, credit); err != nil {
 		t.Errorf("updated ledger transaction error = %v; want nil", err)
 	}
 }
@@ -440,7 +456,7 @@ func assertInvalidUpdateLeavesOriginal(t *testing.T, ledger *core.Ledger) {
 		t.Errorf("original currency = %q; want %q", got, codeUSD)
 	}
 	debit, credit := mustUSDPairEntries(t)
-	if _, err := ledger.ValidateTransaction("tx-original", ledgerEffectiveDate(), false, debit, credit); err != nil {
+	if _, err := validateLedger(t, ledger, "tx-original", ledgerEffectiveDate(), debit, credit); err != nil {
 		t.Errorf("original ledger after failed update error = %v; want nil", err)
 	}
 }

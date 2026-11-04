@@ -3,6 +3,7 @@
 package core_test
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -45,13 +46,11 @@ func TestLedger_ConcurrencySafety(t *testing.T) {
 				return
 			}
 
-			_, err := ledger.ValidateTransaction(
-				"concurrent-tx",
-				time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC),
-				false,
-				e1,
-				e2,
-			)
+			_, err := ledger.ValidateTransaction(context.Background(), core.TransactionInput{
+				ID:            "concurrent-tx",
+				EffectiveDate: time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC),
+				Entries:       []core.Entry{e1, e2},
+			})
 
 			if err != nil {
 				t.Errorf("Concurrent validation failed: %v", err)

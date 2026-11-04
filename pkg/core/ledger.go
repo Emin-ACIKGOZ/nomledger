@@ -3,6 +3,7 @@
 package core
 
 import (
+	"context"
 	"time"
 
 	pkgerr "github.com/Emin-ACIKGOZ/nomledger/pkg/errors"
@@ -39,26 +40,41 @@ func NewLedger(config LedgerConfig, provider interfaces.RateProvider) (*Ledger, 
 	}, nil
 }
 
-// ValidateTransaction constructs and validates a transaction in a single atomic operation.
+// ValidateTransaction validates a TransactionInput and returns an immutable
+// Transaction. It is the canonical validation path.
 //
-// It is the recommended API for standard usage as it automatically manages the
-// lifecycle of the underlying builder and dependencies. It returns a fully validated,
-// immutable Transaction or a typed error if validation fails.
-func (l *Ledger) ValidateTransaction(
+// A nil context is treated as context.Background(). A cancelled context returns
+// a *ValidationError matching both ErrRateProvider and the context error before
+// any validation work, including for same-currency-only transactions. The input
+// entries and metadata map are copied, so later mutation of the input cannot
+// change the returned transaction. Validation uses the same pipeline as
+// TxBuilder.Build and does not mutate the ledger.
+func (l *Ledger) ValidateTransaction(ctx context.Context, in TransactionInput) (Transaction, error) {
+	b := NewTxBuilder(in.ID, in.EffectiveDate, l.config, l.rateProvider)
+	b.isAdjustingEvent = in.IsAdjustingEvent
+	b.entries = append([]Entry(nil), in.Entries...)
+	b.WithMetadata(in.Metadata)
+	b.operation = validateTransactionOperation
+
+	return b.build(ctx)
+}
+
+// ValidateTransactionLegacy validates a transaction using the pre-1.0 call
+// shape. It delegates to ValidateTransaction with context.Background().
+//
+// Deprecated: use ValidateTransaction.
+func (l *Ledger) ValidateTransactionLegacy(
 	id string,
 	effectiveDate time.Time,
 	isAdjustingEvent bool,
 	entries ...Entry,
 ) (Transaction, error) {
-	b := NewTxBuilder(id, effectiveDate, l.config, l.rateProvider)
-
-	b.SetAdjustingEvent(isAdjustingEvent)
-
-	for _, e := range entries {
-		b.AddEntry(e)
-	}
-
-	return b.Build()
+	return l.ValidateTransaction(context.Background(), TransactionInput{
+		ID:               id,
+		EffectiveDate:    effectiveDate,
+		IsAdjustingEvent: isAdjustingEvent,
+		Entries:          entries,
+	})
 }
 
 // Config returns a copy of the ledger's normalised configuration.

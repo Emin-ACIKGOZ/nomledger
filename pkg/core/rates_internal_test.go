@@ -109,7 +109,7 @@ func testCancelledBeforeCall(t *testing.T) {
 	cancel()
 	provider := &cancelingTestProvider{}
 
-	err := validateRates(ctx, mustForeignRateEntries(t), tolerance, provider, asOf)
+	err := validateRates(ctx, mustForeignRateEntries(t), tolerance, provider, asOf, buildOperation)
 	if !errors.Is(err, pkgerr.ErrRateProvider) {
 		t.Fatalf("error = %v; want ErrRateProvider", err)
 	}
@@ -131,7 +131,7 @@ func testNonPositiveEntryRate(t *testing.T) {
 	entry.exchangeRate = decimal.Zero
 	provider := &cancelingTestProvider{}
 
-	err := validateRates(context.Background(), []Entry{entry}, tolerance, provider, asOf)
+	err := validateRates(context.Background(), []Entry{entry}, tolerance, provider, asOf, buildOperation)
 	assertRateErrorInternal(t, err, pkgerr.ErrInvalidExchangeRate, "exchangeRate", 0)
 	if provider.calls != 0 {
 		t.Errorf("provider calls = %d; want 0 for a non-positive entry rate", provider.calls)
@@ -146,7 +146,7 @@ func testProviderCancelsDuringCall(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	provider := &cancelingTestProvider{cancel: cancel}
 
-	err := validateRates(ctx, mustForeignRateEntries(t), tolerance, provider, asOf)
+	err := validateRates(ctx, mustForeignRateEntries(t), tolerance, provider, asOf, buildOperation)
 	if !errors.Is(err, pkgerr.ErrRateProvider) {
 		t.Fatalf("error = %v; want ErrRateProvider", err)
 	}
@@ -168,7 +168,7 @@ func testProviderErrorWithCancellation(t *testing.T) {
 	sentinel := &testProviderFailure{message: "provider failure"}
 	provider := &cancelingErrorProvider{cancel: cancel, err: sentinel}
 
-	err := validateRates(ctx, mustForeignRateEntries(t), tolerance, provider, asOf)
+	err := validateRates(ctx, mustForeignRateEntries(t), tolerance, provider, asOf, buildOperation)
 	if !errors.Is(err, pkgerr.ErrRateProvider) {
 		t.Fatalf("error = %v; want ErrRateProvider", err)
 	}

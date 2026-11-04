@@ -130,7 +130,7 @@ func TestBuildAtomicFailure(t *testing.T) {
 			},
 		},
 		{
-			name: "zero sum",
+			name: "zero-sum failure",
 			build: func() (core.Transaction, error) {
 				builder := core.NewTxBuilder(txID, validDate, txTestConfig(), mockRateProvider{})
 				for _, entry := range unbalancedEntries(t) {
@@ -380,7 +380,7 @@ func TestNoProviderCallsAfterEarlierFailure(t *testing.T) {
 			wantErr: pkgerr.ErrCurrencyMismatch,
 		},
 		{
-			name: "zero sum",
+			name: "zero-sum failure",
 			build: func(provider *recordingRateProvider) (core.Transaction, error) {
 				builder := core.NewTxBuilder(txID, validDate, txTestConfig(), provider)
 				for _, entry := range unbalancedEntries(t) {
