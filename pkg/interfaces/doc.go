@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT
 
-// Package interfaces defines the contracts required for external dependency injection.
+// Package interfaces defines the contracts required for external dependency
+// injection.
 //
-// Implementing these interfaces allows the core validation engine to remain
-// isolated from infrastructure concerns such as databases or external APIs.
+// RateProvider is context- and date-aware: implementations receive a
+// RateRequest containing the transaction currency, functional currency, and
+// effective date. They MUST be deterministic for the same request during one
+// validation and thread-safe when a ledger is shared across goroutines.
 package interfaces

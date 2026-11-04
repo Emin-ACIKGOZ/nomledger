@@ -17,6 +17,10 @@ var (
 	// allowable tolerance compared to the RateProvider.
 	ErrRateDeviation = errors.New("exchange rate exceeds tolerance")
 
+	// ErrRateProvider indicates a rate provider failure or context cancellation
+	// while obtaining exchange rates.
+	ErrRateProvider = errors.New("rate provider error")
+
 	// ErrInvalidPrecision indicates an amount exceeds the ISO 4217 precision
 	// defined for that currency.
 	ErrInvalidPrecision = errors.New("amount exceeds currency precision")

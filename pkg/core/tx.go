@@ -3,6 +3,7 @@
 package core
 
 import (
+	"context"
 	"time"
 
 	pkgerr "github.com/Emin-ACIKGOZ/nomledger/pkg/errors" // Alias package errors to avoid collision
@@ -167,7 +168,13 @@ func (b *TxBuilder) Build() (Transaction, error) {
 	}
 
 	// 5. Validate Rates
-	if err := b.validateRates(); err != nil {
+	if err := validateRates(
+		context.Background(),
+		b.entries,
+		b.config.RateTolerance,
+		b.rateProvider,
+		effectiveDate,
+	); err != nil {
 		return Transaction{}, err
 	}
 
@@ -275,46 +282,4 @@ func (b *TxBuilder) validatePeriod(effectiveDate time.Time) error {
 		return nil
 	}
 	return pkgerr.ErrPeriodClosed
-}
-
-func (b *TxBuilder) validateRates() error {
-	tolerance := b.config.RateTolerance
-
-	for _, e := range b.entries {
-		// Skip if tx currency is same as functional (rate is 1.0)
-		if e.TxCurrency() == e.FunctionalCurrency() {
-			continue
-		}
-
-		// Invariant 2a: Entry Rate Sanity Check
-		// Exchange rates must be strictly positive. Zero is mathematically invalid for conversion.
-		if e.ExchangeRate().LessThanOrEqual(decimal.Zero) {
-			return pkgerr.ErrInvalidExchangeRate
-		}
-
-		if b.rateProvider == nil {
-			return pkgerr.ErrNilRateProvider
-		}
-
-		// Invariant 2b: Rate Check against Provider
-		providerRate, err := b.rateProvider.GetRate(e.TxCurrency(), e.FunctionalCurrency())
-		if err != nil {
-			return err // Return dependency error verbatim
-		}
-
-		// Sanity Check: Provider rates must also be strictly positive.
-		if providerRate.LessThanOrEqual(decimal.Zero) {
-			return pkgerr.ErrInvalidExchangeRate
-		}
-
-		diff := providerRate.Sub(e.ExchangeRate()).Abs()
-
-		// Comparison Semantics: Exclusive limit.
-		// A difference exactly equal to tolerance is VALID.
-		// A difference greater than tolerance is INVALID.
-		if diff.GreaterThan(tolerance) {
-			return pkgerr.ErrRateDeviation
-		}
-	}
-	return nil
 }
