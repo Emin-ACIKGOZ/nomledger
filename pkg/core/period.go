@@ -16,9 +16,11 @@ import (
 //
 // Invariant 3 (Period Closure): The ClosedDate acts as a watermark.
 // Transactions with an EffectiveDate <= ClosedDate are rejected unless
-// they are explicitly marked as Adjusting Events.
+// they are explicitly marked as Adjusting Events. A zero ClosedDate disables
+// the watermark.
 type LedgerConfig struct {
-	// ClosedDate is the timestamp up to which the books are finalized.
+	// ClosedDate is the timestamp up to which the books are finalized. A zero
+	// value disables the period-closure check.
 	ClosedDate time.Time
 
 	// FunctionalCurrency is the base currency for this ledger instance.
@@ -26,16 +28,17 @@ type LedgerConfig struct {
 	FunctionalCurrency string
 
 	// RateTolerance defines the maximum allowable absolute difference between
-	// the provided entry exchange rate and the RateProvider's rate.
-	// This value must be explicitly configured (e.g., 0.00001).
+	// the provided entry exchange rate and the RateProvider's rate. A zero value
+	// requires exact equality.
 	RateTolerance decimal.Decimal
 }
 
 // Validate ensures the configuration is well-formed.
 //
 // FunctionalCurrency must be a valid, ratable, active ISO 4217 currency and
-// RateTolerance must be zero or positive. ClosedDate may be zero. The returned
-// error is a *ValidationError wrapping ErrInvalidConfiguration.
+// RateTolerance must be zero or positive. ClosedDate may be zero, which disables
+// the period-closure check. The returned error is a *ValidationError wrapping
+// ErrInvalidConfiguration.
 func (c LedgerConfig) Validate() error {
 	currencyInfo, err := currency.Lookup(c.FunctionalCurrency)
 	if err != nil {

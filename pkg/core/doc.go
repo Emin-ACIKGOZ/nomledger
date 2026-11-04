@@ -17,11 +17,11 @@
 //  7. Rate integrity: foreign-entry rates match the provider within the
 //     configured tolerance.
 //
-// Validation follows a fixed order: configuration, transaction ID, effective
-// date, non-empty entries, metadata keys, entry validity, currency consistency,
-// zero-sum, period closure, and rate integrity. It fails fast, returns the zero
-// Transaction on every error, and performs no later provider calls after an
-// earlier failure.
+// After builder-option and context checks, validation follows a fixed order:
+// configuration, transaction ID, effective date, non-empty entries, metadata
+// keys, entry validity, currency consistency, zero-sum, period closure, and rate
+// integrity. It fails fast, returns the zero Transaction on every error, and
+// performs no later provider calls after an earlier failure.
 //
 // Ledger.ValidateTransaction(ctx, TransactionInput) is the canonical validation
 // path. It treats a nil context as context.Background() and checks cancellation

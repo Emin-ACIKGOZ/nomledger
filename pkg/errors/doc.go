@@ -38,7 +38,7 @@
 //	| Sentinel | Message | Returned when | Retryable |
 //	|---|---|---|---|
 //	| ErrZeroSumViolation | transaction does not sum to zero | Build sees functional amounts whose exact sum is non-zero. | No |
-//	| ErrPeriodClosed | effective date falls in closed period | A non-adjusting transaction has an effective date at or before ClosedDate. | No |
+//	| ErrPeriodClosed | effective date falls in closed period | A non-adjusting transaction has an effective date at or before ClosedDate. A zero ClosedDate disables the check. | No |
 //	| ErrRateDeviation | exchange rate exceeds tolerance | Provider and entry rates differ by more than RateTolerance. | No |
 //	| ErrRateProvider | rate provider error | Context cancellation or deadline expiry before any validation/provider work (including same-currency transactions), cancellation during a provider call, or a provider call returns an error. | Yes |
 //	| ErrInvalidPrecision | amount exceeds currency precision | An Entry or Money amount has more decimal places than the currency's minor units. | No |

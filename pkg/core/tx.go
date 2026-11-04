@@ -199,10 +199,10 @@ func (b *TxBuilder) WithMetadata(meta map[string]any) *TxBuilder {
 // Build validates the accumulated state and returns an immutable Transaction.
 //
 // It delegates to the same validation pipeline used by
-// Ledger.ValidateTransaction. Validation follows a fixed order: configuration,
-// transaction ID, effective date, non-empty entries, metadata keys, entry
-// validity, currency consistency, zero-sum balance, period closure, and rate
-// integrity. It fails fast, calls no later checks or providers after a failure,
+// Ledger.ValidateTransaction. After builder-option and context checks, validation
+// follows a fixed order: configuration, transaction ID, effective date, non-empty
+// entries, metadata keys, entry validity, currency consistency, zero-sum balance,
+// period closure, and rate integrity. It fails fast, calls no later checks or providers after a failure,
 // and returns the zero Transaction on every error. Field-level failures are
 // *ValidationError values; provider errors are wrapped with ErrRateProvider
 // while preserving their cause.

@@ -4,6 +4,10 @@
 checks in-memory financial data against explicit accounting invariants before
 the data is persisted anywhere.
 
+**Release status:** v0.1.1 is the first tagged release. The API is pre-1.0 and
+may change in minor versions until v1.0.0. See [CHANGELOG.md](CHANGELOG.md) for
+release history.
+
 ## Overview
 
 NomLedger validates transactions and returns structurally immutable,
@@ -22,8 +26,8 @@ go get github.com/Emin-ACIKGOZ/nomledger
 
 ## Quick start
 
-This is a complete, compilable program using the v1 API and an injected clock
-for deterministic `PostedAt` values.
+This is a complete, compilable program using the current API and an injected
+clock for deterministic `PostedAt` values.
 
 ```go
 package main
@@ -186,7 +190,7 @@ require changing the input, configuration, or caller usage.
 | Sentinel | Message | Returned when | Retryable |
 |---|---|---|---|
 | `ErrZeroSumViolation` | `transaction does not sum to zero` | `Build` sees functional amounts whose exact sum is non-zero. | No |
-| `ErrPeriodClosed` | `effective date falls in closed period` | A non-adjusting transaction has an effective date at or before `ClosedDate`. | No |
+| `ErrPeriodClosed` | `effective date falls in closed period` | A non-adjusting transaction has an effective date at or before `ClosedDate`. A zero `ClosedDate` disables the check. | No |
 | `ErrRateDeviation` | `exchange rate exceeds tolerance` | Provider and entry rates differ by more than `RateTolerance`. | No |
 | `ErrRateProvider` | `rate provider error` | Context cancellation or deadline expiry before any validation/provider work (including same-currency transactions), cancellation during a provider call, or a provider call returns an error. | Yes |
 | `ErrInvalidPrecision` | `amount exceeds currency precision` | An `Entry` or `Money` amount has more decimal places than the currency's minor units. | No |
@@ -217,11 +221,13 @@ Every successfully validated transaction satisfies:
 
 - **Non-empty and valid entries**: at least one entry; each entry has a bounded,
   control-character-free account ID, valid and ratable currencies, a non-zero
-  amount at or below the currency's minor units, and a positive exchange rate.
+  amount whose scale does not exceed the currency's minor units, and a positive
+  exchange rate.
 - **Exact zero-sum**: the decimal sum of all functional amounts is exactly zero.
   Ties are not resolved with a tolerance.
 - **Period closure**: non-adjusting transactions at or before `ClosedDate` are
-  rejected. Adjusting events bypass only the period-closure rule.
+  rejected; a zero `ClosedDate` disables the check. Adjusting events bypass only
+  the period-closure rule.
 - **Currency consistency**: every entry's functional currency equals the
   ledger's configured functional currency.
 - **As-of rate integrity**: foreign entries carry an effective date in each rate
@@ -238,9 +244,10 @@ Every successfully validated transaction satisfies:
 - **Metadata copying**: the top-level metadata map is copied, but metadata values
   that are reference types remain caller-owned and shared.
 
-Validation order is fixed: configuration, transaction ID, effective date,
-non-empty entries, metadata keys, entry validity, currency consistency,
-zero-sum, period closure, and rate integrity.
+Builder-option errors and context cancellation are checked before validation
+begins. Validation then follows a fixed order: configuration, transaction ID,
+effective date, non-empty entries, metadata keys, entry validity, currency
+consistency, zero-sum, period closure, and rate integrity.
 
 ## Conformance profile
 
@@ -255,12 +262,13 @@ classification tests, or financial reporting.
 ### `pkg/core`
 
 - `LedgerConfig` with `FunctionalCurrency`, `ClosedDate`, and `RateTolerance`;
-  `Validate()` checks the configuration.
+  `Validate()` checks the configuration. A zero `ClosedDate` disables period
+  closure, and a zero `RateTolerance` requires exact rate equality.
 - `NewLedger(config, provider, opts...)`, `WithClock`, `Config()`, and
   `UpdateConfig(config)`; `NewLedger` and `UpdateConfig` return errors.
   `NewTxBuilder` returns a builder and defers option errors to `Build`.
 - `Ledger.ValidateTransaction(ctx, TransactionInput)` is the canonical path.
-- `ValidateTransactionLegacy` preserves the pre-1.0 variadic call shape and is
+- `ValidateTransactionLegacy` preserves the earlier variadic call shape and is
   deprecated.
 - `TransactionInput` carries ID, effective date, adjusting flag, entries, and
   metadata.
@@ -301,7 +309,7 @@ classification tests, or financial reporting.
 - `RateProvider.GetRate(ctx, req)` is context- and date-aware.
 - `RateProviderFunc` adapts an ordinary function to `RateProvider`.
 
-## Migration from pre-1.0
+## Migration from the prototype
 
 - The module path is `github.com/Emin-ACIKGOZ/nomledger`.
 - `NewLedger` and `UpdateConfig` now return `(*Ledger, error)`. `NewTxBuilder`
@@ -364,7 +372,8 @@ go doc github.com/Emin-ACIKGOZ/nomledger/pkg/errors
 go doc github.com/Emin-ACIKGOZ/nomledger/pkg/interfaces
 ```
 
-The stale generated `documentation.txt` snapshot has been removed.
+See [CHANGELOG.md](CHANGELOG.md) for release history and
+[RELEASE_NOTES.md](RELEASE_NOTES.md) for the v0.1.1 release details.
 
 ## License
 
