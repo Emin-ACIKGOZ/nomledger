@@ -13,20 +13,20 @@ import (
 
 // Transaction represents a persisted, valid financial state.
 //
-// It is the immutable result of a successful validation process. Callers can
-// safely persist this struct or share it across goroutines. Fields are unexported
-// to enforce strict immutability.
+// It is the structurally immutable result of a successful validation process.
+// Callers can safely persist this struct or share it across goroutines. Fields
+// are unexported to enforce structural immutability.
 //
-// Note: Metadata values (interface{}) are shallowly copied. If they contain pointers,
-// the underlying data remains mutable by the caller. The Transaction struct itself
-// guarantees structural immutability of the map.
+// Entries and the top-level metadata map are copied on build and on every
+// accessor call. Metadata values remain caller-owned: if they are reference
+// types, the underlying data remains shared.
 type Transaction struct {
 	id               string
 	effectiveDate    time.Time
 	isAdjustingEvent bool
 	postedAt         time.Time
 	entries          []Entry
-	metadata         map[string]interface{}
+	metadata         map[string]any
 }
 
 // ID returns the unique identifier of the transaction.
@@ -35,12 +35,26 @@ func (t Transaction) ID() string { return t.id }
 // EffectiveDate returns the date on which the transaction impacts the ledger.
 func (t Transaction) EffectiveDate() time.Time { return t.effectiveDate }
 
+// IsAdjustingEvent reports whether the transaction is an IAS 10 adjusting event.
+func (t Transaction) IsAdjustingEvent() bool { return t.isAdjustingEvent }
+
+// PostedAt returns the UTC instant at which the transaction was built.
+func (t Transaction) PostedAt() time.Time { return t.postedAt }
+
 // Entries returns a defensive copy of the immutable entries associated with this transaction.
 // This prevents external mutation of the underlying slice.
 func (t Transaction) Entries() []Entry {
 	entriesCopy := make([]Entry, len(t.entries))
 	copy(entriesCopy, t.entries)
 	return entriesCopy
+}
+
+// Metadata returns a defensive copy of the transaction's metadata map.
+//
+// A nil internal map returns a non-nil empty map. The copy is shallow: metadata
+// values that are reference types remain caller-owned.
+func (t Transaction) Metadata() map[string]any {
+	return copyMetadata(t.metadata)
 }
 
 // TxBuilder accumulates state for constructing a Transaction.
@@ -52,7 +66,7 @@ type TxBuilder struct {
 	effectiveDate    time.Time
 	isAdjustingEvent bool
 	entries          []Entry
-	metadata         map[string]interface{}
+	metadata         map[string]any
 
 	rateProvider interfaces.RateProvider
 	config       LedgerConfig
@@ -71,7 +85,7 @@ func NewTxBuilder(
 		config:        config,
 		rateProvider:  rp,
 		entries:       make([]Entry, 0),
-		metadata:      make(map[string]interface{}),
+		metadata:      make(map[string]any),
 	}
 }
 
@@ -90,15 +104,18 @@ func (b *TxBuilder) SetAdjustingEvent(isAdjusting bool) *TxBuilder {
 
 // WithMetadata adds non-normative data to the transaction.
 //
-// It performs a shallow copy of the provided map into the builder.
-// Note: Mutating values inside the map after passing them here may affect the
-// builder if they are reference types.
-func (b *TxBuilder) WithMetadata(meta map[string]interface{}) *TxBuilder {
+// It performs a shallow copy of the provided map into the builder, so mutating
+// the caller's top-level map after this call does not affect the builder.
+// Metadata values that are reference types remain caller-owned.
+func (b *TxBuilder) WithMetadata(meta map[string]any) *TxBuilder {
 	if meta == nil {
 		return b
 	}
-	for k, v := range meta {
-		b.metadata[k] = v
+	if b.metadata == nil {
+		b.metadata = make(map[string]any, len(meta))
+	}
+	for key, value := range meta {
+		b.metadata[key] = value
 	}
 	return b
 }
@@ -138,8 +155,8 @@ func (b *TxBuilder) Build() (Transaction, error) {
 		effectiveDate:    b.effectiveDate,
 		isAdjustingEvent: b.isAdjustingEvent,
 		postedAt:         time.Now().UTC(),
-		entries:          b.entries,
-		metadata:         b.metadata,
+		entries:          append([]Entry(nil), b.entries...),
+		metadata:         copyMetadata(b.metadata),
 	}, nil
 }
 
