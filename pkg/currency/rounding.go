@@ -3,7 +3,7 @@
 package currency
 
 import (
-	"github.com/Emin-ACIKGOZ/nomledger/pkg/errors"
+	pkgerr "github.com/Emin-ACIKGOZ/nomledger/pkg/errors"
 	"github.com/shopspring/decimal"
 )
 
@@ -35,14 +35,14 @@ const (
 
 // Round rounds amount to the minor units of code using mode.
 //
-// It returns the lookup error for malformed or unknown codes,
-// ErrCurrencyNotRatable for currencies without defined minor units,
-// ErrInvalidRoundingMode for unknown modes, and ErrInexactRounding when
+// It returns a *ValidationError wrapping the lookup error for malformed or
+// unknown codes, ErrCurrencyNotRatable for currencies without defined minor
+// units, ErrInvalidRoundingMode for unknown modes, and ErrInexactRounding when
 // RoundUnnecessary would change the numeric value.
 func Round(amount decimal.Decimal, code Code, mode RoundingMode) (decimal.Decimal, error) {
 	_, minorUnits, err := ratableCurrency(code)
 	if err != nil {
-		return decimal.Zero, err
+		return decimal.Zero, pkgerr.NewValidationError(err, "Round", "code", nil)
 	}
 
 	switch mode {
@@ -57,9 +57,13 @@ func Round(amount decimal.Decimal, code Code, mode RoundingMode) (decimal.Decima
 	case RoundCeiling:
 		return amount.RoundCeil(minorUnits), nil
 	case RoundUnnecessary:
-		return roundUnnecessary(amount, minorUnits)
+		rounded, err := roundUnnecessary(amount, minorUnits)
+		if err != nil {
+			return decimal.Zero, pkgerr.NewValidationError(err, "Round", "amount", nil)
+		}
+		return rounded, nil
 	default:
-		return decimal.Zero, errors.ErrInvalidRoundingMode
+		return decimal.Zero, pkgerr.NewValidationError(pkgerr.ErrInvalidRoundingMode, "Round", "mode", nil)
 	}
 }
 
@@ -77,17 +81,17 @@ func roundUnnecessary(amount decimal.Decimal, places int32) (decimal.Decimal, er
 	if amount.Equal(rounded) {
 		return rounded, nil
 	}
-	return decimal.Zero, errors.ErrInexactRounding
+	return decimal.Zero, pkgerr.ErrInexactRounding
 }
 
 func ratableCurrency(code Code) (Currency, int32, error) {
-	currency, err := Lookup(string(code))
+	currency, err := lookup(string(code))
 	if err != nil {
 		return Currency{}, 0, err
 	}
 	minorUnits, ratable := currency.MinorUnits()
 	if !ratable {
-		return Currency{}, 0, errors.ErrCurrencyNotRatable
+		return Currency{}, 0, pkgerr.ErrCurrencyNotRatable
 	}
 	return currency, minorUnits, nil
 }

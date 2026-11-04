@@ -3,6 +3,7 @@
 package currency
 
 import (
+	"errors"
 	"sort"
 	"strings"
 
@@ -52,6 +53,14 @@ func init() {
 // not enforced; use Currency.MinorUnits to check whether an amount can be
 // represented in the currency.
 func Lookup(code string) (Currency, error) {
+	currency, err := lookup(code)
+	if err != nil {
+		return Currency{}, pkgerr.NewValidationError(err, "Lookup", "code", nil)
+	}
+	return currency, nil
+}
+
+func lookup(code string) (Currency, error) {
 	if !validCode(code) {
 		return Currency{}, pkgerr.ErrInvalidCurrencyCode
 	}
@@ -117,7 +126,21 @@ func GetPrecision(code string) (int32, bool) {
 //
 // Deprecated: use Round with RoundHalfEven, or NewMoney, instead.
 func RoundToPrecision(amount decimal.Decimal, currencyCode string) (decimal.Decimal, error) {
-	return Round(amount, Code(currencyCode), RoundHalfEven)
+	rounded, err := Round(amount, Code(currencyCode), RoundHalfEven)
+	if err == nil {
+		return rounded, nil
+	}
+
+	var validationErr *pkgerr.ValidationError
+	if errors.As(err, &validationErr) {
+		return decimal.Zero, pkgerr.NewValidationError(
+			validationErr.Code,
+			"RoundToPrecision",
+			validationErr.Field,
+			validationErr.Cause,
+		)
+	}
+	return decimal.Zero, pkgerr.NewValidationError(err, "RoundToPrecision", "", nil)
 }
 
 func validCode(code string) bool {

@@ -3,7 +3,7 @@
 package currency
 
 import (
-	"github.com/Emin-ACIKGOZ/nomledger/pkg/errors"
+	pkgerr "github.com/Emin-ACIKGOZ/nomledger/pkg/errors"
 	"github.com/shopspring/decimal"
 )
 
@@ -15,17 +15,17 @@ type Money struct {
 
 // NewMoney constructs a Money amount in the currency identified by code.
 //
-// It rejects malformed or unknown codes through Lookup, rejects non-ratable
-// currencies with ErrCurrencyNotRatable, and rejects amounts whose decimal
-// scale exceeds the currency's minor units with ErrInvalidPrecision. Amounts
-// are never rounded silently.
+// It returns a *ValidationError wrapping malformed or unknown code failures,
+// ErrCurrencyNotRatable for currencies without defined minor units, and
+// ErrInvalidPrecision when the amount's decimal scale exceeds the currency's
+// minor units. Amounts are never rounded silently.
 func NewMoney(amount decimal.Decimal, code Code) (Money, error) {
 	currency, minorUnits, err := ratableCurrency(code)
 	if err != nil {
-		return Money{}, err
+		return Money{}, pkgerr.NewValidationError(err, "NewMoney", "code", nil)
 	}
 	if amount.Exponent() < -minorUnits {
-		return Money{}, errors.ErrInvalidPrecision
+		return Money{}, pkgerr.NewValidationError(pkgerr.ErrInvalidPrecision, "NewMoney", "amount", nil)
 	}
 	return newMoney(amount, currency.Code()), nil
 }
@@ -47,20 +47,22 @@ func (m Money) Currency() Code {
 
 // Add returns the sum of m and other.
 //
-// It returns ErrCurrencyMismatch when the currencies differ.
+// It returns a *ValidationError wrapping ErrCurrencyMismatch when the
+// currencies differ.
 func (m Money) Add(other Money) (Money, error) {
 	if m.code != other.code {
-		return Money{}, errors.ErrCurrencyMismatch
+		return Money{}, pkgerr.NewValidationError(pkgerr.ErrCurrencyMismatch, "Money.Add", "currency", nil)
 	}
 	return newMoney(m.amount.Add(other.amount), m.code), nil
 }
 
 // Sub returns the difference between m and other.
 //
-// It returns ErrCurrencyMismatch when the currencies differ.
+// It returns a *ValidationError wrapping ErrCurrencyMismatch when the
+// currencies differ.
 func (m Money) Sub(other Money) (Money, error) {
 	if m.code != other.code {
-		return Money{}, errors.ErrCurrencyMismatch
+		return Money{}, pkgerr.NewValidationError(pkgerr.ErrCurrencyMismatch, "Money.Sub", "currency", nil)
 	}
 	return newMoney(m.amount.Sub(other.amount), m.code), nil
 }
