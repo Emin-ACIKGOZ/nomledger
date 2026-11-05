@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Version | v0.1.1 |
-| Release date | 2026-11-05 |
+| Release date | 2026-11-06 |
 | Status | Initial public release (pre-1.0) |
 | Go requirement | Go 1.22.2 or newer |
 

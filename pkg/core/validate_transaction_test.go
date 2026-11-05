@@ -165,7 +165,7 @@ func TestValidateTransactionContext(t *testing.T) {
 	input := validTransactionInput(t)
 
 	t.Run("nil context succeeds", func(t *testing.T) {
-		transaction, err := ledger.ValidateTransaction(nil, input) //nolint:staticcheck // T-063 requires nil-context handling
+		transaction, err := ledger.ValidateTransaction(nil, input) //nolint:staticcheck // nil-context handling is required
 		if err != nil {
 			t.Fatalf("ValidateTransaction(nil): %v", err)
 		}

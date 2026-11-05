@@ -5,7 +5,7 @@ All notable changes to NomLedger are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.1] - 2026-11-05
+## [0.1.1] - 2026-11-06
 
 This is the first tagged release; changes below are relative to the pre-release
 prototype.
